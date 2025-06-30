@@ -9,4 +9,7 @@
 
 30 JUN 2025 
 1. 7:15 pm - 8:03 pm - time waste thinking there's bug, but actually no bug in counting, it was just train split so less number of nodes 
-2. 8:04 pm - 
+2. 8:04 pm - 10:48 pm - main loop done 
+
+1 JULY 2025
+1. 1:03 am - 

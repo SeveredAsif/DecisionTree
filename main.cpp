@@ -143,4 +143,5 @@ int main()
     //root->print();
     Trainer trainer;
     trainer.train(root,uniqueTargets);
+    root->printTree();
 }
