@@ -1,0 +1,11 @@
+27 JUN 2025
+11:50 am -12:14 pm 
+1. Read the csv line by line : populate a vector -> each attribute (column) has a place -- for each possible value of that attribute it has a place -- then pos neg place 
+2. lets say i have to calculate the entropy of a certain value in column 2. i will go into the vector's 2 index, go into that values index and find out pos-neg. will take proportion using the pos-neg --done 
+3. lets say i have now all the values entropy. now to calculate IG of that attribute, go to index 2 of the vec, find total pos-neg there, and for each value of that col find the pos-neg there , then find the proportion and previously calculated entropy to find IG 
+4. thought: maybe some class would help that stores the number of pos-neg at each part maybe
+5. wheen i split i should have some kind of node class maybe that should help, and thats connected to number 4 somehow   
+
+
+30 JUN 2025 
+1. 7:15 pm -
