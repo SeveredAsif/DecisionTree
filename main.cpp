@@ -1,5 +1,6 @@
 #include "row.hpp"
 #include "node.hpp"
+#include "trainer.hpp"
 #include <iostream>
 #include <istream>
 #include <string>
@@ -139,4 +140,7 @@ int main()
     //cout<<table[0][table[0].size()-1]<<endl;
     root->setTargetColumn(root->getRows()[0].row.size()-1);
     testSet->setTargetColumn(root->getRows()[0].row.size()-1);
+    //root->print();
+    Trainer trainer;
+    trainer.train(root,uniqueTargets);
 }

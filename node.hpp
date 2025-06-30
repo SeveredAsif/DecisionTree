@@ -1,3 +1,5 @@
+#ifndef NODE_HPP
+#define NODE_HPP
 #include <vector>
 #include "row.hpp"
 class node
@@ -50,3 +52,5 @@ public:
         }
     }
 };
+
+#endif
