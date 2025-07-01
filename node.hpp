@@ -14,11 +14,12 @@ private:
     int targetColumn;
     vector<node *> children;
     int splitCol;
-    int splitVal;
+    float splitVal;
+    int depth;
 
 public:
     node(bool isLeaf, int targetColumn)
-        : isLeaf(isLeaf), targetColumn(targetColumn), splitCol(0), splitVal(0) {}
+        : isLeaf(isLeaf), targetColumn(targetColumn), splitCol(0), splitVal(0) {this->depth=0;}
 
     void addRow(Row &row)
     {
@@ -37,6 +38,14 @@ public:
     void setIsLeaf()
     {
         isLeaf = true;
+    }
+    int getDepth()
+    {
+        return this->depth;
+    }
+    void setDepth(int d)
+    {
+        this->depth = d;
     }
 
     int getTargetColumn()

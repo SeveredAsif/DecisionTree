@@ -122,11 +122,24 @@ float testAccuracy(node *root, node *testSet)
                     break;
             }
         }
-        // At leaf, compare predicted label (majority in leaf) with testRow label
-        // We'll use the first row's label in the leaf as prediction
+        // At leaf, predict the majority label
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
         {
-            int predicted = curr->getRows()[0].row[targetCol];
+            std::map<int, int> labelCounts;
+            for (const auto &r : curr->getRows())
+            {
+                int label = r.row[targetCol];
+                labelCounts[label]++;
+            }
+            int predicted = -1, maxCount = -1;
+            for (const auto &kv : labelCounts)
+            {
+                if (kv.second > maxCount)
+                {
+                    maxCount = kv.second;
+                    predicted = kv.first;
+                }
+            }
             int actual = testRow.row[targetCol];
             if (predicted == actual)
                 correct++;
@@ -136,77 +149,86 @@ float testAccuracy(node *root, node *testSet)
 }
 int main()
 {
-    node *root = new node(false, 0);
-    // Row *r = new Row();
-    // root->addRow(*r);
-    // cout<<root->getRows()[0].row[0]<<endl;
-    std::ifstream file("Datasets/Iris.csv");
-    vector<vector<string>> table;
-    if (file.is_open())
+    int maxDepth;
+    cout << "Enter max depth for the tree: ";
+    cin >> maxDepth;
+    float totalAccuracy = 0;
+    int runs = 20;
+    for (int run = 1; run <= runs; ++run)
     {
-        table = readCSV(file);
-        // Now 'table' contains the CSV data as a vector of vector of strings
-        file.close();
-    }
-    // for(auto val: table[1]){
-    //         cout<<val<<",";
-    // }
-    unordered_map<string, int> targetColMap;
-    int uniqueTargets = 0;
-    int totalColumns = table[0].size();
-    for (int id = 1; id < table.size(); id++)
-    {
-        auto &rows = table[id];
-        if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
+        node *root = new node(false, 0);
+        std::ifstream file("Datasets/Iris.csv");
+        vector<vector<string>> table;
+        if (file.is_open())
         {
-            // find out if the target column already converted into a number
-            targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
+            table = readCSV(file);
+            file.close();
         }
-        // populate my rows class object
-        Row currentRow;
-        for (int i = 0; i < totalColumns; i++)
+        unordered_map<string, int> targetColMap;
+        int uniqueTargets = 0;
+        int totalColumns = table[0].size();
+        for (int id = 1; id < table.size(); id++)
         {
-            if (i != totalColumns - 1)
+            auto &rows = table[id];
+            if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
             {
-                // cout<<rows[i]<<endl;
-                float str_float = stof(rows[i]);
-                currentRow.insertColumn(str_float);
+                // find out if the target column already converted into a number
+                targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
             }
-            else
+            // populate my rows class object
+            Row currentRow;
+            for (int i = 0; i < totalColumns; i++)
             {
-                currentRow.insertColumn(targetColMap[rows[i]]);
-                // cout<<targetColMap[rows[i]]<<endl;
+                if (i != totalColumns - 1)
+                {
+                    // cout<<rows[i]<<endl;
+                    float str_float = stof(rows[i]);
+                    currentRow.insertColumn(str_float);
+                }
+                else
+                {
+                    currentRow.insertColumn(targetColMap[rows[i]]);
+                    // cout<<targetColMap[rows[i]]<<endl;
+                }
+            }
+            root->addRow(currentRow);
+        }
+        // root->print();
+
+        Trainer tt;
+        float ent = tt.publiccalculateEntropy(root,3);
+        cout<<"1.58 should "<<ent<<endl;
+        // train-test split
+        node *testSet = new node(false, 0);
+        srand(time(0) + run); // ensure different split each run
+        int rootSize = root->getRows().size();
+        for (int i = 0; i < (int)rootSize * 0.2; i++)
+        {
+            int index = rand() % root->getRows().size();
+            // cout<<index<<endl;
+            testSet->addRow(root->getRows()[index]);
+            if (index >= 0 && index < root->getRows().size())
+            {
+                root->getRows().erase(root->getRows().begin() + index);
             }
         }
-        root->addRow(currentRow);
-    }
-    // root->print();
+        cout << "train set: " << root->getRows().size() << endl;
+        cout << "test set: " << testSet->getRows().size() << endl;
 
-    // train-test split
-    node *testSet = new node(false, 0);
-    srand(time(0));
-    int rootSize = root->getRows().size();
-    cout << "Current root size: " << rootSize << endl;
-    for (int i = 0; i < (int)rootSize * 0.2; i++)
-    {
-        int index = rand() % root->getRows().size();
-        // cout<<index<<endl;
-        testSet->addRow(root->getRows()[index]);
-        if (index >= 0 && index < root->getRows().size())
-        {
-            root->getRows().erase(root->getRows().begin() + index);
-        }
+        // cout<<table[0][table[0].size()-1]<<endl;
+        root->setTargetColumn(root->getRows()[0].row.size() - 1);
+        testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
+        // root->print();
+        Trainer trainer;
+        trainer.train(root, uniqueTargets, maxDepth);
+        cout << "\nRun " << run << ":\n";
+        root->printTree();
+        float accuracy = testAccuracy(root, testSet);
+        cout << "Test set accuracy: " << accuracy * 100 << "%\n";
+        totalAccuracy += accuracy;
+        delete root;
+        delete testSet;
     }
-    cout << "train set: " << root->getRows().size() << endl;
-    cout << "test set: " << testSet->getRows().size() << endl;
-
-    // cout<<table[0][table[0].size()-1]<<endl;
-    root->setTargetColumn(root->getRows()[0].row.size() - 1);
-    testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
-    // root->print();
-    Trainer trainer;
-    trainer.train(root, uniqueTargets);
-    root->printTree();
-    float accuracy = testAccuracy(root, testSet);
-    cout << "Test set accuracy: " << accuracy * 100 << "%" << endl;
+    cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / runs) * 100 << "%\n";
+    return 0;
 }
