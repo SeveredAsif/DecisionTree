@@ -79,18 +79,24 @@ public:
         return this->splitVal;
     }
 
-    void printTree(int depth = 0, std::string branch = "", std::string splitDesc = "") const
+    void printTree(int depth = 0, const node *parent = nullptr, bool isLeft = true) const
     {
-        // Draw the branch lines
-        if (depth > 0)
+        // ANSI color codes for levels
+        const char *colors[] = {"\033[0m", "\033[36m", "\033[32m", "\033[33m", "\033[35m", "\033[31m"};
+        int colorIdx = depth % 6;
+        std::string indent;
+        for (int i = 0; i < depth; ++i)
+            indent += "    ";
+        std::cout << colors[colorIdx] << indent;
+        if (parent)
         {
-            std::cout << branch.substr(0, branch.size() - 3);
-            std::cout << (branch.back() == '|' ? "|--" : "`--");
-            std::cout << splitDesc;
+            if (isLeft)
+                std::cout << "|-- [L] (col " << parent->splitCol << " <= " << parent->splitVal << ") ";
+            else
+                std::cout << "|-- [R] (col " << parent->splitCol << " > " << parent->splitVal << ") ";
         }
         if (isLeaf)
         {
-            // Count label frequencies
             std::map<int, int> labelCounts;
             for (const auto &r : rows)
             {
@@ -102,24 +108,15 @@ public:
             {
                 std::cout << kv.second << " " << kv.first << "s, ";
             }
-            std::cout << "(Rows: " << rows.size() << ")\n";
+            std::cout << "(Rows: " << rows.size() << ")\033[0m\n";
         }
         else
         {
-            std::cout << "[Node] Split: (col " << splitCol << ", <= " << splitVal << ") (Rows: " << rows.size() << ")\n";
+            std::cout << "[Node] Split: (col " << splitCol << " <= " << splitVal << ") (Rows: " << rows.size() << ")\033[0m\n";
             for (size_t i = 0; i < children.size(); ++i)
             {
-                std::string nextBranch = branch;
-                if (depth > 0)
-                    nextBranch += (branch.back() == '|' ? "|   " : "    ");
-                nextBranch += (i == children.size() - 1 ? "`" : "|");
-                std::string childSplitDesc;
-                if (i == 0)
-                    childSplitDesc = " (col " + std::to_string(splitCol) + " <= " + std::to_string(splitVal) + ") ";
-                else
-                    childSplitDesc = " (col " + std::to_string(splitCol) + " > " + std::to_string(splitVal) + ") ";
                 if (children[i])
-                    children[i]->printTree(depth + 1, nextBranch, childSplitDesc);
+                    children[i]->printTree(depth + 1, this, i == 0);
             }
         }
     }
