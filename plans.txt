@@ -17,25 +17,67 @@
 3. 5:50 pm - 7:49 pm - finding out whats wrong 
 
 2 JULY 2025
-1. 7:55 pm - 
+1. 7:55 pm - 8:50 - iris done full 
+2. 8:55 pm - 10:23 pm - adult.data preprocess done 
+3. 10:23 pm - 
 
 
-        if (gainMode == 0)
+ #include <iostream>
+using namespace std;
+#include <string>
+#include <vector>
+#include <unordered_map>
+class Preprocessor
+{
+public:
+    void preprocess(vector<vector<string>> &v)
+    {
+        int rowSize = v.size();
+        int colSize = v[0].size();
+        cout << "[Preprocessor] Starting preprocessing: " << rowSize << " rows, " << colSize << " columns." << endl;
+        for (int i = 0; i < colSize; i++)
         {
-            return {currentBestGain, currentBestSplit};
+            unordered_map<string, int> targetColMap;
+            int uniqueTargets = 0;
+            for (int j = 0; j < rowSize; j++)
+            {
+                if (v[j].size() != colSize)
+                {
+                    cout << "[Preprocessor] Skipping row " << j << " due to column mismatch: has " << v[j].size() << ", expected " << colSize << ". Row: ";
+                    for (size_t k = 0; k < v[j].size(); ++k)
+                    {
+                        cout << '"' << v[j][k] << '"';
+                        if (k != v[j].size() - 1)
+                            cout << ", ";
+                    }
+                    cout << endl;
+                    continue;
+                }
+                std::string val = v[j][i];
+                // Trim leading/trailing spaces
+                size_t start = val.find_first_not_of(" \t\n\r");
+                size_t end = val.find_last_not_of(" \t\n\r");
+                if (start == std::string::npos)
+                    val = "";
+                else
+                    val = val.substr(start, end - start + 1);
+                if (val.empty() || val == "?" || val == "-")
+                {
+                    v[j][i] = "-1";
+                    continue;
+                }
+                if (targetColMap.find(val) == targetColMap.end())
+                {
+                    targetColMap[val] = uniqueTargets++;
+                }
+                v[j][i] = to_string(targetColMap[val]);
+                if (j % 1000 == 0)
+                {
+                    cout << "[Preprocessor] Encoded row " << j << " col " << i << ": " << v[j][i] << endl;
+                }
+            }
+            cout << "[Preprocessor] Finished column " << i << ", unique values: " << uniqueTargets << endl;
         }
-        else if (gainMode == 1)
-        {
-            float IV = -(((float)leftTotal / currentAllRows.size()) * log2(((float)leftTotal / currentAllRows.size())) - ((float)rightTotal / currentAllRows.size()) * log2(((float)rightTotal / currentAllRows.size())));
-            float gainRatio = (float)currentBestGain / IV;
-            return {gainRatio, currentBestSplit};
-        }
-        else
-        {
-            int totalUnique = findUniquevalues(currNode, splitCol);
-            float NWIG = (currentBestGain / log2(totalUnique + 1)) * (1 - ((totalUnique - 1) / currentAllRows.size()));
-
-            return {NWIG, currentBestSplit};
-        }
-    
- 
+        cout << "[Preprocessor] Done preprocessing." << endl;
+    }
+};

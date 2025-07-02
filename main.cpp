@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <stdlib.h>
 #include <ctime>
+#include "preprocessor.hpp"
 using namespace std;
 
 // CSV read
@@ -178,11 +179,11 @@ int main()
     cout << "Enter max depth for the tree: ";
     cin >> maxDepth;
     float totalAccuracy = 0;
-    int runs = 20;
+    int runs = 1;
     for (int run = 1; run <= runs; ++run)
     {
         node *root = new node(false, 0);
-        std::ifstream file("Datasets/Iris.csv");
+        std::ifstream file("Datasets/adult.data");
         vector<vector<string>> table;
         if (file.is_open())
         {
@@ -192,6 +193,14 @@ int main()
         unordered_map<string, int> targetColMap;
         int uniqueTargets = 0;
         int totalColumns = table[0].size();
+        try{
+            stof(table[1][1]);
+        } catch(invalid_argument &e){
+            cout<<"String error caught"<<endl;
+            Preprocessor preprocessor;
+            preprocessor.preprocess(table);
+            cout<<"pre process done"<<endl;
+        }
         for (int id = 1; id < table.size(); id++)
         {
             auto &rows = table[id];
@@ -253,6 +262,6 @@ int main()
         delete root;
         delete testSet;
     }
-    cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / 20) * 100 << "%\n";
+    cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / runs) * 100 << "%\n";
     return 0;
 }
