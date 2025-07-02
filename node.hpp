@@ -75,7 +75,7 @@ public:
     {
         this->splitCol = a;
     }
-    void setSplitval(int a)
+    void setSplitval(float a)
     {
         this->splitVal = a;
     }
@@ -83,7 +83,7 @@ public:
     {
         return this->splitCol;
     }
-    int getSplitval()
+    float getSplitval()
     {
         return this->splitVal;
     }
@@ -121,7 +121,7 @@ public:
         }
         else
         {
-            std::cout << "[Node] Split: (col " << splitCol << " <= " << splitVal << ") (Rows: " << rows.size() << ")\033[0m\n";
+            std::cout << "[Node]:"  << "(Rows: " << rows.size() << ")\033[0m\n";
             for (size_t i = 0; i < children.size(); ++i)
             {
                 if (children[i])

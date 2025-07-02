@@ -2,6 +2,7 @@
 #include "math.h"
 #include <algorithm>
 #include <queue>
+#include <unordered_set>
 
 class Trainer
 {
@@ -43,6 +44,20 @@ private:
         // cout << "entropy: " << entropy << endl;
         return entropy;
     }
+    int findUniquevalues(node *&currNode,int splitCol)
+    {
+        vector<Row> rows = currNode->getRows();
+        unordered_set<float> unique_set;
+        for(auto row : rows)
+        {
+            auto r = row.row[splitCol];
+            if(unique_set.find(r)==unique_set.end())
+            {
+                unique_set.emplace(r);
+            }
+        }
+        return unique_set.size();
+    }
     void split(node *&currNode, int splitCol, float bestSplit)
     {
         vector<Row> currentAllRows = currNode->getRows();
@@ -74,7 +89,7 @@ private:
             delete rightNode;
     }
 
-    pair<float, float> calculateGain(node *&currNode, int splitCol, float currentEntropy, int unique)
+    pair<float, float> calculateGain(node *&currNode, int splitCol, float currentEntropy, int unique,int gainMode)
     {
         vector<Row> currentAllRows = currNode->getRows();
         // float returnValue = currentEntropy;
@@ -87,7 +102,7 @@ private:
         vector<float> splitValues;
         for (int i = 1; i < currentAllRows.size(); ++i)
         {
-            float avg = (currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
+            float avg = ((float)currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
             splitValues.push_back(avg);
         }
         // get the rows that have less than or equal average value than the calculated average.
@@ -140,6 +155,8 @@ private:
         // }
         float currentBestGain = 0;
         float currentBestSplit = 0;
+        int bestSplitLeftTotal = 0;
+        int bestSplitRightTotal = 0;
 
         for (auto split : splitValues)
         {
@@ -182,55 +199,37 @@ private:
             {
                 currentBestGain = informationGain;
                 currentBestSplit = split;
+                bestSplitLeftTotal = leftTotal;
+                bestSplitRightTotal = rightTotal;
             }
 
             // delete leftNode;
             // delete rightNode;
         }
         // cout << "curr best gain: " << currentBestGain << " curr best split: " << currentBestSplit << endl;
+        if (gainMode == 0)
+        {
+            return {currentBestGain, currentBestSplit};
+        }
+        else if (gainMode == 1)
+        {
+            float IV = -(((float)bestSplitLeftTotal / currentAllRows.size()) * log2(((float)bestSplitLeftTotal / currentAllRows.size())) - ((float)bestSplitRightTotal / currentAllRows.size()) * log2(((float)bestSplitRightTotal / currentAllRows.size())));
+            float gainRatio = (float)currentBestGain / IV;
+            return {gainRatio, currentBestSplit};
+        }
+        else
+        {
+            int totalUnique = findUniquevalues(currNode, splitCol);
+            float NWIG = (currentBestGain / log2(totalUnique + 1)) * (1 - ((totalUnique - 1) / currentAllRows.size()));
+
+            return {NWIG, currentBestSplit};
+        }
+    
         return {currentBestGain, currentBestSplit};
     }
 
 public:
-    float publiccalculateEntropy(node *&root, int unique)
-    {
-        // cout << "entering entropy" << endl;
-        int S = root->getRows().size();
-        float *total = (float *)malloc(unique);
-        for (int i = 0; i < unique; i++)
-        {
-            total[i] = 0;
-        }
-
-        int rowSize = root->getRows()[0].row.size();
-        int rootSize = root->getRows().size();
-        auto rows = root->getRows();
-        int total_nodes = 0;
-        float entropy = 0;
-        for (int i = 0; i < rootSize; i++)
-        {
-            int target = rows[i].row[rowSize - 1];
-            int id = rows[i].row[0];
-            // printf("id:%d, target class: %d for i+1=%d\n",id,target,i+1);
-            total[target]++;
-            total_nodes++;
-            // printf("now target %d is total: %d\n",target,total[target]);
-        }
-        for (int i = 0; i < unique; i++)
-        {
-            // cout<<"total: "<<total[i]<<endl;
-            total[i] = total[i] / total_nodes;
-            // cout<<total[i]*log(total[i])<<endl;
-            if (total[i] != 0)
-            {
-                entropy -= total[i] * log2(total[i]);
-            }
-        }
-        // cout << "entropy: " << entropy << endl;
-        return entropy;
-    }
-
-    void train(node *&root, int unique, int maxDepth)
+    void train(node *&root, int unique, int maxDepth, int gainMode)
     {
         // printf("Unique: %d\n", unique);
 
@@ -258,7 +257,7 @@ public:
             for (int i = 1; i < rowSize - 1; i++)
             {
                 // cout << "no problem reaching here" << endl;
-                pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique);
+                pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique,gainMode);
                 // cout << "currgain: " << IG.first << " , attribute: " << i << " IG.second(bestSplit): " << IG.second << endl;
                 if (IG.first > maxGain)
                 {
@@ -274,12 +273,12 @@ public:
             // cout << "best gain attribute: " << bestGainAttribute << endl;
             // cout << "max gain: " << maxGain << endl;
             // Stop splitting if no gain or split is possible
-            if (maxGain <= 1e-6)
-            {
-                currNode->setIsLeaf();
-                bfs_queue.pop();
-                continue;
-            }
+            // if (maxGain <= 1e-6)
+            // {
+            //     currNode->setIsLeaf();
+            //     bfs_queue.pop();
+            //     continue;
+            // }
             currNode->setSplitCol(bestGainAttribute);
             currNode->setSplitval(bestSplit);
             // split the nodes according to the best split attribute

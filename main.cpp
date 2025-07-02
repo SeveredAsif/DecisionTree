@@ -103,33 +103,56 @@ float testAccuracy(node *root, node *testSet)
     for (const auto &testRow : testSet->getRows())
     {
         node *curr = root;
+        int level = 0;
+        std::vector<float> pathSplits;
+        std::vector<int> pathCols;
+        std::vector<bool> wentLeft;
+        //std::cout << "\033[36mTest row: ";
+        //testRow.print();
+        //std::cout << "\033[0m";
         while (!curr->getIsLeaf())
         {
             int splitCol = curr->getSplitCol();
-            int splitVal = curr->getSplitval();
-            if (testRow.row[splitCol] <= splitVal)
+            float splitVal = curr->getSplitval();
+            float val = testRow.row[splitCol];
+            //std::cout << "  Level " << level << ": Feature[" << splitCol << "] = " << val;
+            if (val <= splitVal)
             {
+                //std::cout << " \033[32m<=\033[0m " << splitVal << " -- go LEFT\n";
                 if (curr->getChildren().size() > 0)
                     curr = curr->getChildren()[0]; // left child
                 else
                     break;
+                wentLeft.push_back(true);
             }
             else
             {
+                //std::cout << " \033[31m>\033[0m " << splitVal << " -- go RIGHT\n";
                 if (curr->getChildren().size() > 1)
                     curr = curr->getChildren()[1]; // right child
                 else
                     break;
+                wentLeft.push_back(false);
             }
+            pathSplits.push_back(splitVal);
+            pathCols.push_back(splitCol);
+            level++;
         }
         // At leaf, predict the majority label
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
         {
             std::map<int, int> labelCounts;
+            float maxSplitVal = -1e9;
             for (const auto &r : curr->getRows())
             {
                 int label = r.row[targetCol];
                 labelCounts[label]++;
+                // Find max split value in this leaf for debug
+                for (size_t i = 0; i < r.row.size(); ++i)
+                {
+                    if (r.row[i] > maxSplitVal)
+                        maxSplitVal = r.row[i];
+                }
             }
             int predicted = -1, maxCount = -1;
             for (const auto &kv : labelCounts)
@@ -141,9 +164,11 @@ float testAccuracy(node *root, node *testSet)
                 }
             }
             int actual = testRow.row[targetCol];
+            //std::cout << "  \033[35mReached leaf. Max value in leaf: " << maxSplitVal << ". Predicting: " << predicted << ", Actual: " << actual << "\033[0m\n";
             if (predicted == actual)
                 correct++;
         }
+        //std::cout << "\033[90m-----------------------------\033[0m\n";
     }
     return (float)correct / total;
 }
@@ -195,9 +220,8 @@ int main()
         }
         // root->print();
 
-        Trainer tt;
-        float ent = tt.publiccalculateEntropy(root,3);
-        cout<<"1.58 should "<<ent<<endl;
+
+        //cout << "1.58 should " << ent << endl;
         // train-test split
         node *testSet = new node(false, 0);
         srand(time(0) + run); // ensure different split each run
@@ -220,7 +244,7 @@ int main()
         testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
         // root->print();
         Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth);
+        trainer.train(root, uniqueTargets, maxDepth,2);
         cout << "\nRun " << run << ":\n";
         root->printTree();
         float accuracy = testAccuracy(root, testSet);
@@ -229,6 +253,6 @@ int main()
         delete root;
         delete testSet;
     }
-    cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / runs) * 100 << "%\n";
+    cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / 20) * 100 << "%\n";
     return 0;
 }
