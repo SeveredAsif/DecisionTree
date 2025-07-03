@@ -60,7 +60,7 @@ private:
         }
         return unique_set.size();
     }
-    void split(node *&currNode, int splitCol, float bestSplit)
+    void split(node *&currNode, int splitCol, float bestSplit,vector<bool> &isCategoricalColumn)
     {
         vector<Row> currentAllRows = currNode->getRows();
         if (bestSplit != -1)
@@ -94,6 +94,7 @@ private:
         }
         else
         {
+            isCategoricalColumn[splitCol] = true;
             cout << "categorical Split on column " << splitCol << endl;
             // find how many unique in split column
             unordered_map<float, int> unique_val_map;
@@ -338,7 +339,7 @@ private:
     }
 
 public:
-    void train(node *&root, int unique, int maxDepth, int gainMode)
+    void train(node *&root, int unique, int maxDepth, int gainMode,vector<bool> &isCategoricalColumn)
     {
 
         // printf("Unique: %d\n", unique);
@@ -371,7 +372,7 @@ public:
                 // cout << "no problem reaching here" << endl;
                 int uniqueValues = findUniquevalues(root, i);
                 int isCategorical;
-                if (uniqueValues > 5)
+                if (uniqueValues > 10)
                 {
                     isCategorical = 0;
                     //cout << "unique values: " << uniqueValues << " on column" << i << ",so non categorical" << endl;
@@ -414,7 +415,7 @@ public:
             // split the nodes according to the best split attribute
             if (bestGainAttribute != 0)
             {
-                split(currNode, bestGainAttribute, bestSplit);
+                split(currNode, bestGainAttribute, bestSplit,isCategoricalColumn);
                 for (auto child : currNode->getChildren())
                 {
                     bfs_queue.push(child);

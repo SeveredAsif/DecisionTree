@@ -12,7 +12,8 @@
 #include "preprocessor.hpp"
 using namespace std;
 
-int isCategorical = 0;
+
+vector<bool> isCategoricalColumn;
 
 // CSV read
 // code source: stack overflow
@@ -98,6 +99,93 @@ std::vector<std::vector<std::string>> readCSV(std::istream &in)
     }
     return table;
 }
+
+
+float testAccuracyMixed(node *root, node *testSet)
+{
+    int correct = 0;
+    int total = testSet->getRows().size();
+    int targetCol = root->getTargetColumn();
+    
+    for (const auto &testRow : testSet->getRows())
+    {
+        node *curr = root;
+        int level = 0;
+        
+        
+        while (!curr->getIsLeaf())
+        {
+            int splitCol = curr->getSplitCol();
+            float val = testRow.row[splitCol];
+            
+            
+            if (splitCol < isCategoricalColumn.size() && isCategoricalColumn[splitCol])
+            {
+                
+                const auto &catMap = curr->getCategoryChildMap();
+                auto it = catMap.find(val);
+                if (it != catMap.end() && it->second < curr->getChildren().size())
+                {
+                    curr = curr->getChildren()[it->second];
+                }
+                else
+                {
+                    
+                    break;
+                }
+            }
+            else
+            {
+                
+                float splitVal = curr->getSplitval();
+                if (val <= splitVal)
+                {
+                    if (curr->getChildren().size() > 0)
+                        curr = curr->getChildren()[0]; // left child
+                    else
+                        break;
+                }
+                else
+                {
+                    if (curr->getChildren().size() > 1)
+                        curr = curr->getChildren()[1]; // right child
+                    else
+                        break;
+                }
+            }
+            level++;
+        }
+        
+        
+        if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
+        {
+            std::map<int, int> labelCounts;
+            for (const auto &r : curr->getRows())
+            {
+                int label = r.row[targetCol];
+                labelCounts[label]++;
+            }
+            
+            int predicted = -1, maxCount = -1;
+            for (const auto &kv : labelCounts)
+            {
+                if (kv.second > maxCount)
+                {
+                    maxCount = kv.second;
+                    predicted = kv.first;
+                }
+            }
+            
+            int actual = testRow.row[targetCol];
+            if (predicted == actual)
+                correct++;
+        }
+    }
+    
+    return (float)correct / total;
+}
+
+
 float testAccuracy(node *root, node *testSet)
 {
     int correct = 0;
@@ -110,18 +198,15 @@ float testAccuracy(node *root, node *testSet)
         std::vector<float> pathSplits;
         std::vector<int> pathCols;
         std::vector<bool> wentLeft;
-        // std::cout << "\033[36mTest row: ";
         // testRow.print();
-        // std::cout << "\033[0m";
         while (!curr->getIsLeaf())
         {
             int splitCol = curr->getSplitCol();
             float splitVal = curr->getSplitval();
             float val = testRow.row[splitCol];
-            // std::cout << "  Level " << level << ": Feature[" << splitCol << "] = " << val;
+            
             if (val <= splitVal)
             {
-                // std::cout << " \033[32m<=\033[0m " << splitVal << " -- go LEFT\n";
                 if (curr->getChildren().size() > 0)
                     curr = curr->getChildren()[0]; // left child
                 else
@@ -130,7 +215,6 @@ float testAccuracy(node *root, node *testSet)
             }
             else
             {
-                // std::cout << " \033[31m>\033[0m " << splitVal << " -- go RIGHT\n";
                 if (curr->getChildren().size() > 1)
                     curr = curr->getChildren()[1]; // right child
                 else
@@ -141,7 +225,8 @@ float testAccuracy(node *root, node *testSet)
             pathCols.push_back(splitCol);
             level++;
         }
-        // At leaf, predict the majority label
+        
+        
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
         {
             std::map<int, int> labelCounts;
@@ -167,14 +252,13 @@ float testAccuracy(node *root, node *testSet)
                 }
             }
             int actual = testRow.row[targetCol];
-            // std::cout << "  \033[35mReached leaf. Max value in leaf: " << maxSplitVal << ". Predicting: " << predicted << ", Actual: " << actual << "\033[0m\n";
             if (predicted == actual)
                 correct++;
         }
-        // std::cout << "\033[90m-----------------------------\033[0m\n";
     }
     return (float)correct / total;
 }
+
 float testAccuracyCategorical(node *root, node *testSet)
 {
     int correct = 0;
@@ -198,6 +282,7 @@ float testAccuracyCategorical(node *root, node *testSet)
                 break; // Unseen category, fallback to majority at this node
             }
         }
+        
         // At leaf, predict the majority label
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
         {
@@ -223,6 +308,7 @@ float testAccuracyCategorical(node *root, node *testSet)
     }
     return (float)correct / total;
 }
+
 int main()
 {
     int maxDepth;
@@ -230,6 +316,7 @@ int main()
     cin >> maxDepth;
     float totalAccuracy = 0;
     int runs = 20;
+    
     for (int run = 1; run <= runs; ++run)
     {
         //adult.data
@@ -242,9 +329,15 @@ int main()
             table = readCSV(file);
             file.close();
         }
+        
         unordered_map<string, int> targetColMap;
         int uniqueTargets = 0;
         int totalColumns = table[0].size();
+        
+       
+        isCategoricalColumn.clear();
+        isCategoricalColumn.resize(totalColumns, false);
+        
         for (int id = 1; id < table.size(); id++)
         {
             auto &rows = table[id];
@@ -263,10 +356,10 @@ int main()
                     }
                     catch (invalid_argument &e)
                     {
+                        //isCategoricalColumn[i] = true;
                         //cout << "String error caught" << endl;
-                        isCategorical = 0;
                         Preprocessor preprocessor;
-                        preprocessor.preprocess(table,i);
+                        preprocessor.preprocess(table, i);
                         //cout << "pre process done" << endl;
                     }
 
@@ -280,6 +373,7 @@ int main()
             }
             root->addRow(currentRow);
         }
+        
         node *testSet = new node(false, 0);
         srand(time(0) + run);
         int rootSize = root->getRows().size();
@@ -292,13 +386,18 @@ int main()
                 root->getRows().erase(root->getRows().begin() + index);
             }
         }
+        
         cout << "train set: " << root->getRows().size() << endl;
         cout << "test set: " << testSet->getRows().size() << endl;
+        
         root->setTargetColumn(root->getRows()[0].row.size() - 1);
         testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
+        
         Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth, 2);
+        trainer.train(root, uniqueTargets, maxDepth, 0, isCategoricalColumn);
+        
         cout << "\nRun " << run << ":\n";
+        
         // Print tree to file
         std::ofstream treeOut("tree_output.txt");
         root->printTree();
@@ -312,6 +411,7 @@ int main()
         {
             cout << "Failed to open tree_output.txt for writing.\n";
         }
+        
         // Export tree to DOT format for Graphviz
         std::ofstream dotOut("tree.dot");
         if (dotOut.is_open())
@@ -327,16 +427,16 @@ int main()
         {
             cout << "Failed to open tree.dot for writing.\n";
         }
-        float accuracy = 0.0f;
-        if (isCategorical)
-            accuracy = testAccuracyCategorical(root, testSet);
-        else
-            accuracy = testAccuracy(root, testSet);
+        
+        // Use the new mixed accuracy function
+        float accuracy = testAccuracyMixed(root, testSet);
         cout << "Test set accuracy: " << accuracy * 100 << "%\n";
         totalAccuracy += accuracy;
+        
         delete root;
         delete testSet;
     }
+    
     cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / runs) * 100 << "%\n";
     return 0;
 }

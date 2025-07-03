@@ -214,65 +214,108 @@ public:
         }
     }
 
-    void exportToDot(std::ofstream &out, int &nodeId, int parentId = -1, std::string edgeLabel = "") const
+void exportToDot(std::ofstream &out, int &nodeId, int parentId = -1, std::string edgeLabel = "") const
+{
+    int myId = nodeId++;
+    std::ostringstream label;
+    
+    if (isLeaf)
     {
-        int myId = nodeId++;
-        std::ostringstream label;
-        if (isLeaf)
+        // Fixed: properly count labels like in printTree
+        std::map<int, int> labelCounts;
+        for (const auto &r : rows)
         {
-            std::map<int, int> labelCounts;
-            for (const auto &r : rows)
-                labelCounts[static_cast<int>(r.row[targetColumn])];
-            label << "Leaf\n";
-            for (const auto &kv : labelCounts)
-                label << kv.first << ": " << kv.second << "\\n";
-            label << "Rows: " << rows.size();
+            int labelValue = static_cast<int>(r.row[targetColumn]);
+            labelCounts[labelValue]++;
+        }
+        
+        label << "Leaf\\n";
+        for (const auto &kv : labelCounts)
+        {
+            label << kv.second << " " << kv.first << "s\\n";
+        }
+        label << "Rows: " << rows.size();
+        
+        // Style leaf nodes differently
+        out << "  node" << myId << " [label=\"" << label.str() << "\", shape=box, style=filled, fillcolor=lightgreen]\n";
+    }
+    else
+    {
+        // Handle both categorical and continuous splits like printTree
+        if (children.size() > 2)
+        {
+            // Multiway split (categorical)
+            label << "col " << splitCol << "\\n(categorical)\\n";
         }
         else
         {
-            if (getChildren().size() > 2)
-            {
-                label << "col " << splitCol << ", multiway";
-            }
-            else
-            {
-                label << "col " << splitCol << " <= " << splitVal;
-            }
+            // Binary split (continuous)
+            label << "col " << splitCol << " <= " << splitVal << "\\n";
         }
-        out << "  node" << myId << " [label=\"" << label.str() << "\"]\n";
-        if (parentId != -1)
+        label << "Rows: " << rows.size();
+        
+        // Style internal nodes
+        out << "  node" << myId << " [label=\"" << label.str() << "\", shape=ellipse, style=filled, fillcolor=lightblue]\n";
+    }
+    
+    // Add edge from parent to this node
+    if (parentId != -1)
+    {
+        out << "  node" << parentId << " -> node" << myId;
+        if (!edgeLabel.empty())
+            out << " [label=\"" << edgeLabel << "\"]";
+        out << "\n";
+    }
+    
+    // Recursively export children
+    if (!isLeaf)
+    {
+        for (size_t i = 0; i < children.size(); ++i)
         {
-            out << "  node" << parentId << " -> node" << myId;
-            if (!edgeLabel.empty())
-                out << " [label=\"" << edgeLabel << "\"]";
-            out << "\n";
-        }
-        if (!isLeaf)
-        {
-            for (size_t i = 0; i < children.size(); ++i)
+            std::string childEdgeLabel;
+            
+            if (children.size() > 2)
             {
-                std::string childEdgeLabel;
-                if (getChildren().size() > 2)
+                // Multiway split: find the category value for this child
+                // This matches the logic in printTree
+                bool foundLabel = false;
+                for (const auto &cat : categoryChildMap)
                 {
-                    if (!children[i]->getRows().empty())
+                    if (cat.second == static_cast<int>(i))
                     {
-                        float val = children[i]->getRows()[0].row[splitCol];
-                        childEdgeLabel = std::to_string(val);
+                        childEdgeLabel = "val = " + std::to_string(static_cast<int>(cat.first));
+                        foundLabel = true;
+                        break;
+                    }
+                }
+                if (!foundLabel)
+                {
+                    // Fallback: use the value from the first row in this child if available
+                    if (children[i] && !children[i]->rows.empty())
+                    {
+                        float val = children[i]->rows[0].row[splitCol];
+                        childEdgeLabel = "val = " + std::to_string(static_cast<int>(val));
                     }
                     else
                     {
-                        childEdgeLabel = "?";
+                        childEdgeLabel = "val = ?";
                     }
                 }
-                else
-                {
-                    childEdgeLabel = (i == 0) ? "<= " + std::to_string(splitVal) : "> " + std::to_string(splitVal);
-                }
-                if (children[i])
-                    children[i]->exportToDot(out, nodeId, myId, childEdgeLabel);
             }
+            else
+            {
+                // Binary split: left/right labels
+                if (i == 0)
+                    childEdgeLabel = "<= " + std::to_string(splitVal);
+                else
+                    childEdgeLabel = "> " + std::to_string(splitVal);
+            }
+            
+            if (children[i])
+                children[i]->exportToDot(out, nodeId, myId, childEdgeLabel);
         }
     }
+}
 };
 
 #endif
