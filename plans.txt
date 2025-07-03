@@ -19,7 +19,10 @@
 2 JULY 2025
 1. 7:55 pm - 8:50 - iris done full 
 2. 8:55 pm - 10:23 pm - adult.data preprocess done 
-3. 10:23 pm - 
+3. 10:23 pm - 10:30 pm - some 
+
+3 JULY 2025 
+1. 10:32 am - 
 
 
  #include <iostream>

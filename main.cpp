@@ -12,6 +12,8 @@
 #include "preprocessor.hpp"
 using namespace std;
 
+int isCategorical = 0;
+
 // CSV read
 // code source: stack overflow
 // link: https://stackoverflow.com/questions/1120140/how-can-i-read-and-parse-csv-files-in-c
@@ -108,18 +110,18 @@ float testAccuracy(node *root, node *testSet)
         std::vector<float> pathSplits;
         std::vector<int> pathCols;
         std::vector<bool> wentLeft;
-        //std::cout << "\033[36mTest row: ";
-        //testRow.print();
-        //std::cout << "\033[0m";
+        // std::cout << "\033[36mTest row: ";
+        // testRow.print();
+        // std::cout << "\033[0m";
         while (!curr->getIsLeaf())
         {
             int splitCol = curr->getSplitCol();
             float splitVal = curr->getSplitval();
             float val = testRow.row[splitCol];
-            //std::cout << "  Level " << level << ": Feature[" << splitCol << "] = " << val;
+            // std::cout << "  Level " << level << ": Feature[" << splitCol << "] = " << val;
             if (val <= splitVal)
             {
-                //std::cout << " \033[32m<=\033[0m " << splitVal << " -- go LEFT\n";
+                // std::cout << " \033[32m<=\033[0m " << splitVal << " -- go LEFT\n";
                 if (curr->getChildren().size() > 0)
                     curr = curr->getChildren()[0]; // left child
                 else
@@ -128,7 +130,7 @@ float testAccuracy(node *root, node *testSet)
             }
             else
             {
-                //std::cout << " \033[31m>\033[0m " << splitVal << " -- go RIGHT\n";
+                // std::cout << " \033[31m>\033[0m " << splitVal << " -- go RIGHT\n";
                 if (curr->getChildren().size() > 1)
                     curr = curr->getChildren()[1]; // right child
                 else
@@ -165,11 +167,66 @@ float testAccuracy(node *root, node *testSet)
                 }
             }
             int actual = testRow.row[targetCol];
-            //std::cout << "  \033[35mReached leaf. Max value in leaf: " << maxSplitVal << ". Predicting: " << predicted << ", Actual: " << actual << "\033[0m\n";
+            // std::cout << "  \033[35mReached leaf. Max value in leaf: " << maxSplitVal << ". Predicting: " << predicted << ", Actual: " << actual << "\033[0m\n";
             if (predicted == actual)
                 correct++;
         }
-        //std::cout << "\033[90m-----------------------------\033[0m\n";
+        // std::cout << "\033[90m-----------------------------\033[0m\n";
+    }
+    return (float)correct / total;
+}
+float testAccuracyCategorical(node *root, node *testSet)
+{
+    int correct = 0;
+    int total = testSet->getRows().size();
+    int targetCol = root->getTargetColumn();
+    for (const auto &testRow : testSet->getRows())
+    {
+        node *curr = root;
+        while (!curr->getIsLeaf())
+        {
+            int splitCol = curr->getSplitCol();
+            float val = testRow.row[splitCol];
+            // Find the child whose split value matches val
+            bool found = false;
+            for (auto child : curr->getChildren())
+            {
+                if (!child->getRows().empty())
+                {
+                    float childVal = child->getRows()[0].row[splitCol];
+                    if (childVal == val)
+                    {
+                        curr = child;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found)
+                break; // No matching child, stop
+        }
+        // At leaf, predict the majority label
+        if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
+        {
+            std::map<int, int> labelCounts;
+            for (const auto &r : curr->getRows())
+            {
+                int label = r.row[targetCol];
+                labelCounts[label]++;
+            }
+            int predicted = -1, maxCount = -1;
+            for (const auto &kv : labelCounts)
+            {
+                if (kv.second > maxCount)
+                {
+                    maxCount = kv.second;
+                    predicted = kv.first;
+                }
+            }
+            int actual = testRow.row[targetCol];
+            if (predicted == actual)
+                correct++;
+        }
     }
     return (float)correct / total;
 }
@@ -183,7 +240,7 @@ int main()
     for (int run = 1; run <= runs; ++run)
     {
         node *root = new node(false, 0);
-        std::ifstream file("Datasets/adult.data");
+        std::ifstream file("Datasets/test.csv");
         vector<vector<string>> table;
         if (file.is_open())
         {
@@ -193,52 +250,46 @@ int main()
         unordered_map<string, int> targetColMap;
         int uniqueTargets = 0;
         int totalColumns = table[0].size();
-        try{
+        try
+        {
             stof(table[1][1]);
-        } catch(invalid_argument &e){
-            cout<<"String error caught"<<endl;
+        }
+        catch (invalid_argument &e)
+        {
+            cout << "String error caught" << endl;
+            isCategorical = 0;
             Preprocessor preprocessor;
             preprocessor.preprocess(table);
-            cout<<"pre process done"<<endl;
+            cout << "pre process done" << endl;
         }
         for (int id = 1; id < table.size(); id++)
         {
             auto &rows = table[id];
             if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
             {
-                // find out if the target column already converted into a number
                 targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
             }
-            // populate my rows class object
             Row currentRow;
             for (int i = 0; i < totalColumns; i++)
             {
                 if (i != totalColumns - 1)
                 {
-                    // cout<<rows[i]<<endl;
                     float str_float = stof(rows[i]);
                     currentRow.insertColumn(str_float);
                 }
                 else
                 {
                     currentRow.insertColumn(targetColMap[rows[i]]);
-                    // cout<<targetColMap[rows[i]]<<endl;
                 }
             }
             root->addRow(currentRow);
         }
-        // root->print();
-
-
-        //cout << "1.58 should " << ent << endl;
-        // train-test split
         node *testSet = new node(false, 0);
-        srand(time(0) + run); // ensure different split each run
+        srand(time(0) + run);
         int rootSize = root->getRows().size();
         for (int i = 0; i < (int)rootSize * 0.2; i++)
         {
             int index = rand() % root->getRows().size();
-            // cout<<index<<endl;
             testSet->addRow(root->getRows()[index]);
             if (index >= 0 && index < root->getRows().size())
             {
@@ -247,16 +298,17 @@ int main()
         }
         cout << "train set: " << root->getRows().size() << endl;
         cout << "test set: " << testSet->getRows().size() << endl;
-
-        // cout<<table[0][table[0].size()-1]<<endl;
         root->setTargetColumn(root->getRows()[0].row.size() - 1);
         testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
-        // root->print();
         Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth,2);
+        trainer.train(root, uniqueTargets, maxDepth, 2, isCategorical);
         cout << "\nRun " << run << ":\n";
         root->printTree();
-        float accuracy = testAccuracy(root, testSet);
+        float accuracy = 0.0f;
+        if (isCategorical)
+            accuracy = testAccuracyCategorical(root, testSet);
+        else
+            accuracy = testAccuracy(root, testSet);
         cout << "Test set accuracy: " << accuracy * 100 << "%\n";
         totalAccuracy += accuracy;
         delete root;

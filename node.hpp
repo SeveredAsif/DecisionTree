@@ -19,7 +19,7 @@ private:
 
 public:
     node(bool isLeaf, int targetColumn)
-        : isLeaf(isLeaf), targetColumn(targetColumn), splitCol(0), splitVal(0) {this->depth=0;}
+        : isLeaf(isLeaf), targetColumn(targetColumn), splitCol(0), splitVal(0) { this->depth = 0; }
 
     void addRow(Row &row)
     {
@@ -60,7 +60,7 @@ public:
     {
         children.push_back(child);
     }
-    vector<node *> &getChildren()
+    const vector<node *> &getChildren() const
     {
         return children;
     }
@@ -79,11 +79,11 @@ public:
     {
         this->splitVal = a;
     }
-    int getSplitCol()
+    int getSplitCol() const
     {
         return this->splitCol;
     }
-    float getSplitval()
+    float getSplitval() const
     {
         return this->splitVal;
     }
@@ -99,10 +99,26 @@ public:
         std::cout << colors[colorIdx] << indent;
         if (parent)
         {
-            if (isLeft)
-                std::cout << "|-- [L] (col " << parent->splitCol << " <= " << parent->splitVal << ") ";
+            if (parent->getChildren().size() > 2)
+            {
+                // Multiway split: print value that leads to this child
+                if (!rows.empty())
+                {
+                    float val = rows[0].row[parent->getSplitCol()];
+                    std::cout << "|-- [val = " << val << "] (col " << parent->getSplitCol() << ") ";
+                }
+                else
+                {
+                    std::cout << "|-- [val = ?] (col " << parent->getSplitCol() << ") ";
+                }
+            }
             else
-                std::cout << "|-- [R] (col " << parent->splitCol << " > " << parent->splitVal << ") ";
+            {
+                if (isLeft)
+                    std::cout << "|-- [L] (col " << parent->getSplitCol() << " <= " << parent->getSplitval() << ") ";
+                else
+                    std::cout << "|-- [R] (col " << parent->getSplitCol() << " > " << parent->getSplitval() << ") ";
+            }
         }
         if (isLeaf)
         {
@@ -121,7 +137,7 @@ public:
         }
         else
         {
-            std::cout << "[Node]:"  << "(Rows: " << rows.size() << ")\033[0m\n";
+            std::cout << "[Node]:" << "(Rows: " << rows.size() << ")\033[0m\n";
             for (size_t i = 0; i < children.size(); ++i)
             {
                 if (children[i])

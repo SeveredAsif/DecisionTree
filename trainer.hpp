@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <queue>
 #include <unordered_set>
+#include <unordered_map>
 
 class Trainer
 {
@@ -44,14 +45,14 @@ private:
         // cout << "entropy: " << entropy << endl;
         return entropy;
     }
-    int findUniquevalues(node *&currNode,int splitCol)
+    int findUniquevalues(node *&currNode, int splitCol)
     {
         vector<Row> rows = currNode->getRows();
         unordered_set<float> unique_set;
-        for(auto row : rows)
+        for (auto row : rows)
         {
             auto r = row.row[splitCol];
-            if(unique_set.find(r)==unique_set.end())
+            if (unique_set.find(r) == unique_set.end())
             {
                 unique_set.emplace(r);
             }
@@ -61,35 +62,70 @@ private:
     void split(node *&currNode, int splitCol, float bestSplit)
     {
         vector<Row> currentAllRows = currNode->getRows();
-
-        node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
-        leftNode->setDepth(currNode->getDepth() + 1);
-        node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
-        rightNode->setDepth(currNode->getDepth() + 1);
-        for (int i = 0; i < currentAllRows.size(); i++)
+        if (bestSplit != -1)
         {
-            Row row = currentAllRows[i];
-            if (row.row[splitCol] <= bestSplit)
+            node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
+            leftNode->setDepth(currNode->getDepth() + 1);
+            node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
+            rightNode->setDepth(currNode->getDepth() + 1);
+            for (int i = 0; i < currentAllRows.size(); i++)
             {
-                leftNode->addRow(row);
+                Row row = currentAllRows[i];
+                if (row.row[splitCol] <= bestSplit)
+                {
+                    leftNode->addRow(row);
+                }
+                else
+                {
+                    rightNode->addRow(row);
+                }
             }
+
+            if (leftNode->getRows().size() > 0)
+                currNode->addChild(leftNode);
             else
+                delete leftNode;
+            if (rightNode->getRows().size() > 0)
+                currNode->addChild(rightNode);
+            else
+                delete rightNode;
+        }
+        else
+        {
+            cout<<"categoricalSplit"<<endl;
+            // find how many unique in split column
+            unordered_map<float, int> unique_val_map;
+            int unique_split_val = 0;
+            for (const auto &row : currentAllRows)
             {
-                rightNode->addRow(row);
+                float key = row.row[splitCol];
+                if (unique_val_map.find(key) == unique_val_map.end())
+                {
+                    unique_val_map[key] = unique_split_val++;
+                }
+            }
+
+            int numUniqueChildren = unique_split_val;
+            vector<node *> children(numUniqueChildren);
+            for (int i = 0; i < numUniqueChildren; i++)
+            {
+                children[i] = new node(false, currentAllRows[0].row.size() - 1);
+                children[i]->setDepth(currNode->getDepth() + 1);
+            }
+            for (int i = 0; i < currentAllRows.size(); i++)
+            {
+                Row row = currentAllRows[i];
+
+                children[unique_val_map[row.row[splitCol]]]->addRow(row);
+            }
+            for (int i = 0; i < children.size(); i++)
+            {
+                currNode->addChild(children[i]);
             }
         }
-
-        if (leftNode->getRows().size() > 0)
-            currNode->addChild(leftNode);
-        else
-            delete leftNode;
-        if (rightNode->getRows().size() > 0)
-            currNode->addChild(rightNode);
-        else
-            delete rightNode;
     }
 
-    pair<float, float> calculateGain(node *&currNode, int splitCol, float currentEntropy, int unique,int gainMode)
+    pair<float, float> calculateGain(node *&currNode, int splitCol, float currentEntropy, int unique, int gainMode, int DTmode)
     {
         vector<Row> currentAllRows = currNode->getRows();
         // float returnValue = currentEntropy;
@@ -99,137 +135,205 @@ private:
              {
                  return a.row[splitCol] < b.row[splitCol];
              });
-        vector<float> splitValues;
-        for (int i = 1; i < currentAllRows.size(); ++i)
+
+        if (DTmode == 0)
         {
-            float avg = ((float)currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
-            splitValues.push_back(avg);
+            vector<float> splitValues;
+            for (int i = 1; i < currentAllRows.size(); ++i)
+            {
+                float avg = ((float)currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
+                splitValues.push_back(avg);
+            }
+            // get the rows that have less than or equal average value than the calculated average.
+            // make a node using those rows.
+            // calculate the new nodes' entropy
+            // calculate IG -= nodes' total row/total row in currNode * calculate entropy
+            //  pop those rows from current rows, repeat the process
+            // for (int i = 1; i < currentAllRows.size(); ++i)
+            // {
+            //     float avg = (currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
+            //     splitValues.push_back(avg);
+            //     node *newNode = new node(false, currentAllRows[0].row.size() - 1);
+            //     for (int j = i - 1; j < currentAllRows.size(); j++)
+            //     {
+            //         Row row = currentAllRows[j];
+            //         if (row.row[splitCol] <= avg)
+            //         {
+            //             newNode->addRow(row);
+            //             if(j>i)
+            //             {
+            //                 i=j;
+            //             }
+            //         }
+            //         else
+            //         {
+            //             if(j>i)
+            //             {
+            //                 i=j;
+            //             }
+
+            //             break;
+            //         }
+            //     }
+            //     // calculate unique values in the new node
+
+            //     // unordered_set<int> unique;
+            //     vector<Row> newNodeRows = newNode->getRows();
+            //     // cout<<"new node row count: "<<newNodeRows.size()<<endl;
+            //     //  for(int i=0;i<newNodeRows.size();i++){
+            //     //      Row r = newNodeRows[i];
+            //     //      if(unique.find(r.row[r.row.size()-1]) ==unique.end() ){
+            //     //          unique.insert(r.row[r.row.size()-1]);
+            //     //      }
+            //     //  }
+            //     // calculate entropy of new node
+            //     float newEntropy = calculateEntropy(newNode, unique);
+            //     // calculate IG
+            //     returnValue -= (((float)newNodeRows.size() / currentAllRows.size()) * newEntropy);
+            //     // cout<<"new entropy: "<<newEntropy<<",newNodeRows.size()="<<newNodeRows.size()<<",currentAllRows.size()="<<currentAllRows.size()<<", newNodeRows.size()/currentAllRows.size()="<<(float)newNodeRows.size()/currentAllRows.size()<<", return value now: "<<returnValue<<endl;
+            // }
+            float currentBestGain = 0;
+            float currentBestSplit = 0;
+            int bestSplitLeftTotal = 0;
+            int bestSplitRightTotal = 0;
+
+            for (auto split : splitValues)
+            {
+                int leftTotal = 0, rightTotal = 0;
+                vector<int> leftCounts(unique, 0), rightCounts(unique, 0);
+                // node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
+                // node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
+                for (int i = 0; i < currentAllRows.size(); i++)
+                {
+                    Row row = currentAllRows[i];
+                    int targetCol = row.row[row.row.size() - 1];
+                    if (row.row[splitCol] <= split)
+                    {
+                        // leftNode->addRow(row);
+                        leftCounts[targetCol]++;
+                        leftTotal++;
+                    }
+                    else
+                    {
+                        rightCounts[targetCol]++;
+                        rightTotal++;
+                        // rightNode->addRow(row);
+                    }
+                }
+                // cout<<"left node size: "<<leftNode->getRows().size()<<" and right node size: "<<rightNode->getRows().size()<<endl;
+                // float leftEntropy = calculateEntropy(leftNode, unique);
+                // float rightEntropy = calculateEntropy(rightNode, unique);
+                float leftEntropy = 0, rightEntropy = 0;
+                for (int i = 0; i < unique; ++i)
+                {
+                    if (leftCounts[i] > 0)
+                        leftEntropy -= (float(leftCounts[i]) / leftTotal) * log2(float(leftCounts[i]) / leftTotal);
+                    if (rightCounts[i] > 0)
+                        rightEntropy -= (float(rightCounts[i]) / rightTotal) * log2(float(rightCounts[i]) / rightTotal);
+                }
+                // float informationGain = currentEntropy - (((float)leftNode->getRows().size() / currentAllRows.size()) * leftEntropy) - (((float)rightNode->getRows().size() / currentAllRows.size()) * rightEntropy);
+                float informationGain = currentEntropy - (float(leftTotal) / currentAllRows.size()) * leftEntropy - (float(rightTotal) / currentAllRows.size()) * rightEntropy;
+                // cout << "IGIG: " << informationGain << endl;
+                if (informationGain > currentBestGain)
+                {
+                    currentBestGain = informationGain;
+                    currentBestSplit = split;
+                    bestSplitLeftTotal = leftTotal;
+                    bestSplitRightTotal = rightTotal;
+                }
+
+                // delete leftNode;
+                // delete rightNode;
+            }
+            // cout << "curr best gain: " << currentBestGain << " curr best split: " << currentBestSplit << endl;
+            if (gainMode == 0)
+            {
+                return {currentBestGain, currentBestSplit};
+            }
+            else if (gainMode == 1)
+            {
+                float IV = -(((float)bestSplitLeftTotal / currentAllRows.size()) * log2(((float)bestSplitLeftTotal / currentAllRows.size())) - ((float)bestSplitRightTotal / currentAllRows.size()) * log2(((float)bestSplitRightTotal / currentAllRows.size())));
+                float gainRatio = (float)currentBestGain / IV;
+                return {gainRatio, currentBestSplit};
+            }
+            else
+            {
+                int totalUnique = findUniquevalues(currNode, splitCol);
+                float NWIG = (currentBestGain / log2(totalUnique + 1)) * (1 - ((totalUnique - 1) / currentAllRows.size()));
+
+                return {NWIG, currentBestSplit};
+            }
+
+            return {currentBestGain, currentBestSplit};
         }
-        // get the rows that have less than or equal average value than the calculated average.
-        // make a node using those rows.
-        // calculate the new nodes' entropy
-        // calculate IG -= nodes' total row/total row in currNode * calculate entropy
-        //  pop those rows from current rows, repeat the process
-        // for (int i = 1; i < currentAllRows.size(); ++i)
-        // {
-        //     float avg = (currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
-        //     splitValues.push_back(avg);
-        //     node *newNode = new node(false, currentAllRows[0].row.size() - 1);
-        //     for (int j = i - 1; j < currentAllRows.size(); j++)
-        //     {
-        //         Row row = currentAllRows[j];
-        //         if (row.row[splitCol] <= avg)
-        //         {
-        //             newNode->addRow(row);
-        //             if(j>i)
-        //             {
-        //                 i=j;
-        //             }
-        //         }
-        //         else
-        //         {
-        //             if(j>i)
-        //             {
-        //                 i=j;
-        //             }
-
-        //             break;
-        //         }
-        //     }
-        //     // calculate unique values in the new node
-
-        //     // unordered_set<int> unique;
-        //     vector<Row> newNodeRows = newNode->getRows();
-        //     // cout<<"new node row count: "<<newNodeRows.size()<<endl;
-        //     //  for(int i=0;i<newNodeRows.size();i++){
-        //     //      Row r = newNodeRows[i];
-        //     //      if(unique.find(r.row[r.row.size()-1]) ==unique.end() ){
-        //     //          unique.insert(r.row[r.row.size()-1]);
-        //     //      }
-        //     //  }
-        //     // calculate entropy of new node
-        //     float newEntropy = calculateEntropy(newNode, unique);
-        //     // calculate IG
-        //     returnValue -= (((float)newNodeRows.size() / currentAllRows.size()) * newEntropy);
-        //     // cout<<"new entropy: "<<newEntropy<<",newNodeRows.size()="<<newNodeRows.size()<<",currentAllRows.size()="<<currentAllRows.size()<<", newNodeRows.size()/currentAllRows.size()="<<(float)newNodeRows.size()/currentAllRows.size()<<", return value now: "<<returnValue<<endl;
-        // }
-        float currentBestGain = 0;
-        float currentBestSplit = 0;
-        int bestSplitLeftTotal = 0;
-        int bestSplitRightTotal = 0;
-
-        for (auto split : splitValues)
+        else
         {
-            int leftTotal = 0, rightTotal = 0;
-            vector<int> leftCounts(unique, 0), rightCounts(unique, 0);
-            // node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
-            // node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
+            // find how many unique in split column
+            unordered_map<float, int> unique_val_map;
+            int unique_split_val = 0;
+            for (const auto &row : currentAllRows)
+            {
+                float key = row.row[splitCol];
+                if (unique_val_map.find(key) == unique_val_map.end())
+                {
+                    unique_val_map[key] = unique_split_val++;
+                }
+            }
+            // number of unique values = number of children
+            vector<vector<int>> children(unique_val_map.size(), vector<int>(unique, 0));
+            vector<int> childrenRowCount(unique_val_map.size());
+            // iterate all rows, count
             for (int i = 0; i < currentAllRows.size(); i++)
             {
                 Row row = currentAllRows[i];
                 int targetCol = row.row[row.row.size() - 1];
-                if (row.row[splitCol] <= split)
-                {
-                    // leftNode->addRow(row);
-                    leftCounts[targetCol]++;
-                    leftTotal++;
-                }
-                else
-                {
-                    rightCounts[targetCol]++;
-                    rightTotal++;
-                    // rightNode->addRow(row);
-                }
+                int child_index = unique_val_map[row.row[splitCol]];
+                childrenRowCount[child_index]++;
+                children[child_index][targetCol]++;
             }
-            // cout<<"left node size: "<<leftNode->getRows().size()<<" and right node size: "<<rightNode->getRows().size()<<endl;
-            // float leftEntropy = calculateEntropy(leftNode, unique);
-            // float rightEntropy = calculateEntropy(rightNode, unique);
+            // Now i have the necessary info to count IG
             float leftEntropy = 0, rightEntropy = 0;
+            vector<float> entropy(unique_val_map.size(), 0);
+
             for (int i = 0; i < unique; ++i)
             {
-                if (leftCounts[i] > 0)
-                    leftEntropy -= (float(leftCounts[i]) / leftTotal) * log2(float(leftCounts[i]) / leftTotal);
-                if (rightCounts[i] > 0)
-                    rightEntropy -= (float(rightCounts[i]) / rightTotal) * log2(float(rightCounts[i]) / rightTotal);
+                for (int j = 0; j < children.size(); j++)
+                {
+                    if (children[j][i] > 0)
+                    {
+                        entropy[j] -= ((float)children[j][i] / childrenRowCount[j]) * log2((float)children[j][i] / childrenRowCount[j]);
+                    }
+                }
             }
-            // float informationGain = currentEntropy - (((float)leftNode->getRows().size() / currentAllRows.size()) * leftEntropy) - (((float)rightNode->getRows().size() / currentAllRows.size()) * rightEntropy);
-            float informationGain = currentEntropy - (float(leftTotal) / currentAllRows.size()) * leftEntropy - (float(rightTotal) / currentAllRows.size()) * rightEntropy;
-            // cout << "IGIG: " << informationGain << endl;
-            if (informationGain > currentBestGain)
+            float informationGain = currentEntropy;
+            float IV = 0;
+            for (int child = 0; child < children.size(); child++)
             {
-                currentBestGain = informationGain;
-                currentBestSplit = split;
-                bestSplitLeftTotal = leftTotal;
-                bestSplitRightTotal = rightTotal;
+                informationGain -= ((float)childrenRowCount[child] / currentAllRows.size()) * entropy[child];
+                IV -= ((float)childrenRowCount[child] / currentAllRows.size()) * log2((float)childrenRowCount[child] / currentAllRows.size());
             }
+            if (gainMode == 0)
+            {
+                return {informationGain, -1};
+            }
+            else if (gainMode == 1)
+            {
 
-            // delete leftNode;
-            // delete rightNode;
-        }
-        // cout << "curr best gain: " << currentBestGain << " curr best split: " << currentBestSplit << endl;
-        if (gainMode == 0)
-        {
-            return {currentBestGain, currentBestSplit};
-        }
-        else if (gainMode == 1)
-        {
-            float IV = -(((float)bestSplitLeftTotal / currentAllRows.size()) * log2(((float)bestSplitLeftTotal / currentAllRows.size())) - ((float)bestSplitRightTotal / currentAllRows.size()) * log2(((float)bestSplitRightTotal / currentAllRows.size())));
-            float gainRatio = (float)currentBestGain / IV;
-            return {gainRatio, currentBestSplit};
-        }
-        else
-        {
-            int totalUnique = findUniquevalues(currNode, splitCol);
-            float NWIG = (currentBestGain / log2(totalUnique + 1)) * (1 - ((totalUnique - 1) / currentAllRows.size()));
+                float gainRatio = (float)informationGain / IV;
+                return {gainRatio, -1};
+            }
+            else
+            {
+                int totalUnique = findUniquevalues(currNode, splitCol);
+                float NWIG = (informationGain / log2(totalUnique + 1)) * (1 - ((totalUnique - 1) / currentAllRows.size()));
 
-            return {NWIG, currentBestSplit};
+                return {NWIG, -1};
+            }
         }
-    
-        return {currentBestGain, currentBestSplit};
     }
 
 public:
-    void train(node *&root, int unique, int maxDepth, int gainMode)
+    void train(node *&root, int unique, int maxDepth, int gainMode, int isCategorical)
     {
         // printf("Unique: %d\n", unique);
 
@@ -257,7 +361,7 @@ public:
             for (int i = 1; i < rowSize - 1; i++)
             {
                 // cout << "no problem reaching here" << endl;
-                pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique,gainMode);
+                pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique, gainMode, isCategorical);
                 // cout << "currgain: " << IG.first << " , attribute: " << i << " IG.second(bestSplit): " << IG.second << endl;
                 if (IG.first > maxGain)
                 {
