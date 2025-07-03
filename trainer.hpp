@@ -8,6 +8,7 @@
 class Trainer
 {
 private:
+    int totalColumn = 0;
     float calculateEntropy(node *&root, int unique)
     {
         // cout << "entering entropy" << endl;
@@ -64,6 +65,7 @@ private:
         vector<Row> currentAllRows = currNode->getRows();
         if (bestSplit != -1)
         {
+            cout << "Continuous Split on column" << splitCol << endl;
             node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
             leftNode->setDepth(currNode->getDepth() + 1);
             node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
@@ -92,7 +94,7 @@ private:
         }
         else
         {
-            cout<<"categoricalSplit"<<endl;
+            cout << "categorical Split on column" << splitCol << endl;
             // find how many unique in split column
             unordered_map<float, int> unique_val_map;
             int unique_split_val = 0;
@@ -122,6 +124,7 @@ private:
             {
                 currNode->addChild(children[i]);
             }
+            currNode->setCategoryChildMap(unique_val_map);
         }
     }
 
@@ -333,13 +336,16 @@ private:
     }
 
 public:
-    void train(node *&root, int unique, int maxDepth, int gainMode, int isCategorical)
+    void train(node *&root, int unique, int maxDepth, int gainMode)
     {
+
         // printf("Unique: %d\n", unique);
 
         // split the node using the maximum gain
         // first choose a column, calculate its gain, store it.
         int rowSize = root->getRows()[0].row.size();
+        totalColumn = rowSize;
+        vector<bool> doneColumn(rowSize, false);
 
         node *currNode = root;
         queue<node *> bfs_queue;
@@ -361,6 +367,23 @@ public:
             for (int i = 1; i < rowSize - 1; i++)
             {
                 // cout << "no problem reaching here" << endl;
+                int uniqueValues = findUniquevalues(root, i);
+                int isCategorical;
+                if (uniqueValues > 10)
+                {
+                    isCategorical = 0;
+                    //cout<<"unique values: "<<uniqueValues<<" on column"<<i<<",so non categorical"<<endl;
+                }
+                else
+                {
+                    isCategorical = 1;
+                    //cout<<"unique values: "<<uniqueValues<<" on column"<<i<<",so categorical"<<endl;
+                }
+                if (doneColumn[i] == true && isCategorical == 1)
+                {
+                    cout << "skipping column " << i << " because categorical data and this column already done" << endl;
+                    break;
+                }
                 pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique, gainMode, isCategorical);
                 // cout << "currgain: " << IG.first << " , attribute: " << i << " IG.second(bestSplit): " << IG.second << endl;
                 if (IG.first > maxGain)
@@ -385,12 +408,17 @@ public:
             // }
             currNode->setSplitCol(bestGainAttribute);
             currNode->setSplitval(bestSplit);
+            doneColumn[bestGainAttribute] = true;
             // split the nodes according to the best split attribute
-            split(currNode, bestGainAttribute, bestSplit);
-            for (auto child : currNode->getChildren())
+            if (bestGainAttribute != 0)
             {
-                bfs_queue.push(child);
+                split(currNode, bestGainAttribute, bestSplit);
+                for (auto child : currNode->getChildren())
+                {
+                    bfs_queue.push(child);
+                }
             }
+
             bfs_queue.pop();
         }
     }

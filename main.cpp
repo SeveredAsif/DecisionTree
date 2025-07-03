@@ -187,23 +187,16 @@ float testAccuracyCategorical(node *root, node *testSet)
         {
             int splitCol = curr->getSplitCol();
             float val = testRow.row[splitCol];
-            // Find the child whose split value matches val
-            bool found = false;
-            for (auto child : curr->getChildren())
+            const auto &catMap = curr->getCategoryChildMap();
+            auto it = catMap.find(val);
+            if (it != catMap.end() && it->second < curr->getChildren().size())
             {
-                if (!child->getRows().empty())
-                {
-                    float childVal = child->getRows()[0].row[splitCol];
-                    if (childVal == val)
-                    {
-                        curr = child;
-                        found = true;
-                        break;
-                    }
-                }
+                curr = curr->getChildren()[it->second];
             }
-            if (!found)
-                break; // No matching child, stop
+            else
+            {
+                break; // Unseen category, fallback to majority at this node
+            }
         }
         // At leaf, predict the majority label
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
@@ -250,18 +243,6 @@ int main()
         unordered_map<string, int> targetColMap;
         int uniqueTargets = 0;
         int totalColumns = table[0].size();
-        try
-        {
-            stof(table[1][1]);
-        }
-        catch (invalid_argument &e)
-        {
-            cout << "String error caught" << endl;
-            isCategorical = 0;
-            Preprocessor preprocessor;
-            preprocessor.preprocess(table);
-            cout << "pre process done" << endl;
-        }
         for (int id = 1; id < table.size(); id++)
         {
             auto &rows = table[id];
@@ -274,6 +255,19 @@ int main()
             {
                 if (i != totalColumns - 1)
                 {
+                    try
+                    {
+                        stof(rows[i]);
+                    }
+                    catch (invalid_argument &e)
+                    {
+                        cout << "String error caught" << endl;
+                        isCategorical = 0;
+                        Preprocessor preprocessor;
+                        preprocessor.preprocess(table,i);
+                        cout << "pre process done" << endl;
+                    }
+
                     float str_float = stof(rows[i]);
                     currentRow.insertColumn(str_float);
                 }
@@ -301,9 +295,35 @@ int main()
         root->setTargetColumn(root->getRows()[0].row.size() - 1);
         testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
         Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth, 2, isCategorical);
+        trainer.train(root, uniqueTargets, maxDepth, 2);
         cout << "\nRun " << run << ":\n";
-        root->printTree();
+        // Print tree to file
+        std::ofstream treeOut("tree_output.txt");
+        if (treeOut.is_open())
+        {
+            root->printTreeToFile(treeOut);
+            treeOut.close();
+            cout << "Tree written to tree_output.txt\n";
+        }
+        else
+        {
+            cout << "Failed to open tree_output.txt for writing.\n";
+        }
+        // Export tree to DOT format for Graphviz
+        std::ofstream dotOut("tree.dot");
+        if (dotOut.is_open())
+        {
+            dotOut << "digraph DecisionTree {\n";
+            int nodeId = 0;
+            root->exportToDot(dotOut, nodeId);
+            dotOut << "}\n";
+            dotOut.close();
+            cout << "Tree exported to tree.dot (Graphviz format)\n";
+        }
+        else
+        {
+            cout << "Failed to open tree.dot for writing.\n";
+        }
         float accuracy = 0.0f;
         if (isCategorical)
             accuracy = testAccuracyCategorical(root, testSet);
