@@ -1,0 +1,27 @@
+
+==== Experiment on Datasets/adult.data ====
+
+Depth: 2
+Run 1: 77.0613%
+Run 2: 61.7995%
+Run 3: 75.4491%
+Run 4: 75.4798%
+Run 5: 76.0786%
+Run 6: 62.3829%
+Run 7: 76.3857%
+Run 8: 75.8022%
+Run 9: 76.3396%
+Run 10: 75.2495%
+Run 11: 62.0605%
+Run 12: 75.5259%
+Run 13: 76.6928%
+Run 14: 74.9731%
+Run 15: 75.4184%
+Run 16: 75.618%
+Run 17: 76.9998%
+Run 18: 62.2601%
+Run 19: 61.6306%
+Run 20: 62.5825%
+Average accuracy for depth 2: 71.7895%
+
+Depth: 3

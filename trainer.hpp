@@ -65,7 +65,7 @@ private:
         vector<Row> currentAllRows = currNode->getRows();
         if (bestSplit != -1)
         {
-            cout << "Continuous Split on column" << splitCol << endl;
+            cout << "Continuous Split on column " << splitCol << endl;
             node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
             leftNode->setDepth(currNode->getDepth() + 1);
             node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
@@ -94,7 +94,7 @@ private:
         }
         else
         {
-            cout << "categorical Split on column" << splitCol << endl;
+            cout << "categorical Split on column " << splitCol << endl;
             // find how many unique in split column
             unordered_map<float, int> unique_val_map;
             int unique_split_val = 0;
@@ -141,11 +141,13 @@ private:
 
         if (DTmode == 0)
         {
+            float minVal = currentAllRows.front().row[splitCol];
+            float maxVal = currentAllRows.back().row[splitCol];
             vector<float> splitValues;
-            for (int i = 1; i < currentAllRows.size(); ++i)
-            {
-                float avg = ((float)currentAllRows[i - 1].row[splitCol] + currentAllRows[i].row[splitCol]) / 2.0;
-                splitValues.push_back(avg);
+            for (int b = 1; b < 100; ++b)
+            { 
+                float split = minVal + b * (float)(maxVal - minVal) / 100;
+                splitValues.push_back(split);
             }
             // get the rows that have less than or equal average value than the calculated average.
             // make a node using those rows.
@@ -369,19 +371,19 @@ public:
                 // cout << "no problem reaching here" << endl;
                 int uniqueValues = findUniquevalues(root, i);
                 int isCategorical;
-                if (uniqueValues > 10)
+                if (uniqueValues > 5)
                 {
                     isCategorical = 0;
-                    //cout<<"unique values: "<<uniqueValues<<" on column"<<i<<",so non categorical"<<endl;
+                    //cout << "unique values: " << uniqueValues << " on column" << i << ",so non categorical" << endl;
                 }
                 else
                 {
                     isCategorical = 1;
-                    //cout<<"unique values: "<<uniqueValues<<" on column"<<i<<",so categorical"<<endl;
+                    //cout << "unique values: " << uniqueValues << " on column" << i << ",so categorical" << endl;
                 }
                 if (doneColumn[i] == true && isCategorical == 1)
                 {
-                    cout << "skipping column " << i << " because categorical data and this column already done" << endl;
+                    //cout << "skipping column " << i << " because categorical data and this column already done" << endl;
                     break;
                 }
                 pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique, gainMode, isCategorical);

@@ -225,118 +225,104 @@ float testAccuracyCategorical(node *root, node *testSet)
 }
 int main()
 {
-    int maxDepth;
-    cout << "Enter max depth for the tree: ";
-    cin >> maxDepth;
-    float totalAccuracy = 0;
+    vector<int> depths = {2, 3, 4};
     int runs = 20;
-    for (int run = 1; run <= runs; ++run)
+    string dataset = "Datasets/adult.data"; // You can change this to "Datasets/Iris.csv" or others
+    ofstream report("experiment_results.txt", ios::app);
+    if (!report.is_open())
     {
-        //adult.data
-        //Iris.csv
-        node *root = new node(false, 0);
-        std::ifstream file("Datasets/adult.data");
-        vector<vector<string>> table;
-        if (file.is_open())
-        {
-            table = readCSV(file);
-            file.close();
-        }
-        unordered_map<string, int> targetColMap;
-        int uniqueTargets = 0;
-        int totalColumns = table[0].size();
-        for (int id = 1; id < table.size(); id++)
-        {
-            auto &rows = table[id];
-            if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
-            {
-                targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
-            }
-            Row currentRow;
-            for (int i = 0; i < totalColumns; i++)
-            {
-                if (i != totalColumns - 1)
-                {
-                    try
-                    {
-                        stof(rows[i]);
-                    }
-                    catch (invalid_argument &e)
-                    {
-                        //cout << "String error caught" << endl;
-                        isCategorical = 0;
-                        Preprocessor preprocessor;
-                        preprocessor.preprocess(table,i);
-                        //cout << "pre process done" << endl;
-                    }
-
-                    float str_float = stof(rows[i]);
-                    currentRow.insertColumn(str_float);
-                }
-                else
-                {
-                    currentRow.insertColumn(targetColMap[rows[i]]);
-                }
-            }
-            root->addRow(currentRow);
-        }
-        node *testSet = new node(false, 0);
-        srand(time(0) + run);
-        int rootSize = root->getRows().size();
-        for (int i = 0; i < (int)rootSize * 0.2; i++)
-        {
-            int index = rand() % root->getRows().size();
-            testSet->addRow(root->getRows()[index]);
-            if (index >= 0 && index < root->getRows().size())
-            {
-                root->getRows().erase(root->getRows().begin() + index);
-            }
-        }
-        cout << "train set: " << root->getRows().size() << endl;
-        cout << "test set: " << testSet->getRows().size() << endl;
-        root->setTargetColumn(root->getRows()[0].row.size() - 1);
-        testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
-        Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth, 2);
-        cout << "\nRun " << run << ":\n";
-        // Print tree to file
-        std::ofstream treeOut("tree_output.txt");
-        root->printTree();
-        if (treeOut.is_open())
-        {
-            root->printTreeToFile(treeOut);
-            treeOut.close();
-            cout << "Tree written to tree_output.txt\n";
-        }
-        else
-        {
-            cout << "Failed to open tree_output.txt for writing.\n";
-        }
-        // Export tree to DOT format for Graphviz
-        std::ofstream dotOut("tree.dot");
-        if (dotOut.is_open())
-        {
-            dotOut << "digraph DecisionTree {\n";
-            int nodeId = 0;
-            root->exportToDot(dotOut, nodeId);
-            dotOut << "}\n";
-            dotOut.close();
-            cout << "Tree exported to tree.dot (Graphviz format)\n";
-        }
-        else
-        {
-            cout << "Failed to open tree.dot for writing.\n";
-        }
-        float accuracy = 0.0f;
-        if (isCategorical)
-            accuracy = testAccuracyCategorical(root, testSet);
-        else
-            accuracy = testAccuracy(root, testSet);
-        cout << "Test set accuracy: " << accuracy * 100 << "%\n";
-        totalAccuracy += accuracy;
-        delete root;
-        delete testSet;
+        cout << "Failed to open experiment_results.txt for writing.\n";
+        return 1;
     }
-    cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / runs) * 100 << "%\n";
+    report << "\n==== Experiment on " << dataset << " ====" << endl;
+    for (int maxDepth : depths)
+    {
+        float totalAccuracy = 0;
+        report << "\nDepth: " << maxDepth << endl;
+        for (int run = 1; run <= runs; ++run)
+        {
+            node *root = new node(false, 0);
+            std::ifstream file(dataset);
+            vector<vector<string>> table;
+            if (file.is_open())
+            {
+                table = readCSV(file);
+                file.close();
+            }
+            unordered_map<string, int> targetColMap;
+            int uniqueTargets = 0;
+            int totalColumns = table[0].size();
+            for (int id = 1; id < table.size(); id++)
+            {
+                auto &rows = table[id];
+                if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
+                {
+                    targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
+                }
+                Row currentRow;
+                for (int i = 0; i < totalColumns; i++)
+                {
+                    if (i != totalColumns - 1)
+                    {
+                        try
+                        {
+                            stof(rows[i]);
+                        }
+                        catch (invalid_argument &e)
+                        {
+                            isCategorical = 0;
+                            Preprocessor preprocessor;
+                            preprocessor.preprocess(table, i);
+                        }
+                        float str_float = stof(rows[i]);
+                        currentRow.insertColumn(str_float);
+                    }
+                    else
+                    {
+                        currentRow.insertColumn(targetColMap[rows[i]]);
+                    }
+                }
+                root->addRow(currentRow);
+            }
+            node *testSet = new node(false, 0);
+            srand(time(0) + run + maxDepth * 100);
+            int rootSize = root->getRows().size();
+            for (int i = 0; i < (int)rootSize * 0.2; i++)
+            {
+                int index = rand() % root->getRows().size();
+                testSet->addRow(root->getRows()[index]);
+                if (index >= 0 && index < root->getRows().size())
+                {
+                    root->getRows().erase(root->getRows().begin() + index);
+                }
+            }
+            root->setTargetColumn(root->getRows()[0].row.size() - 1);
+            testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
+            Trainer trainer;
+            trainer.train(root, uniqueTargets, maxDepth, 2);
+            float accuracy = 0.0f;
+            if (isCategorical)
+                accuracy = testAccuracyCategorical(root, testSet);
+            else
+                accuracy = testAccuracy(root, testSet);
+            totalAccuracy += accuracy;
+            // Print tree to file (append mode)
+            std::ofstream treeOut("tree_prints.txt", ios::app);
+            if (treeOut.is_open())
+            {
+                treeOut << "\nRun " << run << " (Depth " << maxDepth << "):\n";
+                root->printTreeToFile(treeOut);
+                treeOut.close();
+            }
+            report << "Run " << run << ": " << accuracy * 100 << "%\n";
+            delete root;
+            delete testSet;
+        }
+        report << "Average accuracy for depth " << maxDepth << ": " << (totalAccuracy / runs) * 100 << "%\n";
+        report.flush();
+    }
+    report << "==== End of experiment ====\n";
+    report.close();
+    cout << "Experiment completed. Results written to experiment_results.txt\n";
     return 0;
 }
