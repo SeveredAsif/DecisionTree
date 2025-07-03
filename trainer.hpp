@@ -60,7 +60,7 @@ private:
         }
         return unique_set.size();
     }
-    void split(node *&currNode, int splitCol, float bestSplit,vector<bool> &isCategoricalColumn)
+    void split(node *&currNode, int splitCol, float bestSplit, vector<bool> &isCategoricalColumn)
     {
         vector<Row> currentAllRows = currNode->getRows();
         if (bestSplit != -1)
@@ -146,7 +146,7 @@ private:
             float maxVal = currentAllRows.back().row[splitCol];
             vector<float> splitValues;
             for (int b = 1; b < 100; ++b)
-            { 
+            {
                 float split = minVal + b * (float)(maxVal - minVal) / 100;
                 splitValues.push_back(split);
             }
@@ -339,9 +339,8 @@ private:
     }
 
 public:
-    void train(node *&root, int unique, int maxDepth, int gainMode,vector<bool> &isCategoricalColumn)
+    void train(node *&root, int unique, int maxDepth, int gainMode, vector<bool> &isCategoricalColumn)
     {
-
         // printf("Unique: %d\n", unique);
 
         // split the node using the maximum gain
@@ -353,19 +352,27 @@ public:
         node *currNode = root;
         queue<node *> bfs_queue;
         bfs_queue.push(root);
+
         while (!bfs_queue.empty())
         {
             currNode = bfs_queue.front();
+            bfs_queue.pop();
+
             float currentEntropy = calculateEntropy(currNode, unique);
-            if (currentEntropy == 0 || currNode->getIsLeaf() || currNode->getDepth() >= maxDepth)
+
+            if (currentEntropy == 0 ||
+                currNode->getIsLeaf() ||
+                currNode->getDepth() >= maxDepth ||
+                currNode->getRows().size() < 2)
             {
                 currNode->setIsLeaf();
-                bfs_queue.pop();
                 continue;
             }
+
             float maxGain = 0;
             float bestSplit = 0;
             int bestGainAttribute = 0;
+
             // cout << "HERE" << endl;
             for (int i = 1; i < rowSize - 1; i++)
             {
@@ -375,18 +382,19 @@ public:
                 if (uniqueValues > 10)
                 {
                     isCategorical = 0;
-                    //cout << "unique values: " << uniqueValues << " on column" << i << ",so non categorical" << endl;
+                    // cout << "unique values: " << uniqueValues << " on column" << i << ",so non categorical" << endl;
                 }
                 else
                 {
                     isCategorical = 1;
-                    //cout << "unique values: " << uniqueValues << " on column" << i << ",so categorical" << endl;
+                    // cout << "unique values: " << uniqueValues << " on column" << i << ",so categorical" << endl;
                 }
+
                 if (doneColumn[i] == true && isCategorical == 1)
                 {
-                    //cout << "skipping column " << i << " because categorical data and this column already done" << endl;
-                    break;
+                    continue; // cout << "skipping column " << i << " because categorical data and this column already done" << endl;
                 }
+
                 pair<float, float> IG = calculateGain(currNode, i, currentEntropy, unique, gainMode, isCategorical);
                 // cout << "currgain: " << IG.first << " , attribute: " << i << " IG.second(bestSplit): " << IG.second << endl;
                 if (IG.first > maxGain)
@@ -409,20 +417,35 @@ public:
             //     bfs_queue.pop();
             //     continue;
             // }
+
+            if (maxGain <= 1e-6 || bestGainAttribute == 0)
+            {
+                currNode->setIsLeaf();
+                continue;
+            }
+
             currNode->setSplitCol(bestGainAttribute);
             currNode->setSplitval(bestSplit);
             doneColumn[bestGainAttribute] = true;
+
             // split the nodes according to the best split attribute
-            if (bestGainAttribute != 0)
+            split(currNode, bestGainAttribute, bestSplit, isCategoricalColumn);
+
+            for (auto child : currNode->getChildren())
             {
-                split(currNode, bestGainAttribute, bestSplit,isCategoricalColumn);
-                for (auto child : currNode->getChildren())
+                if (child != nullptr)
                 {
-                    bfs_queue.push(child);
+                    if (child->getDepth() < maxDepth)
+                    {
+                        bfs_queue.push(child);
+                    }
+                    else
+                    {
+
+                        child->setIsLeaf();
+                    }
                 }
             }
-
-            bfs_queue.pop();
         }
     }
 };

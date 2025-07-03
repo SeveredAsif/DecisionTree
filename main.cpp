@@ -315,14 +315,14 @@ int main()
     cout << "Enter max depth for the tree: ";
     cin >> maxDepth;
     float totalAccuracy = 0;
-    int runs = 20;
+    int runs = 1;
     
     for (int run = 1; run <= runs; ++run)
     {
         //adult.data
         //Iris.csv
         node *root = new node(false, 0);
-        std::ifstream file("Datasets/adult.data");
+        std::ifstream file("Datasets/Iris.csv");
         vector<vector<string>> table;
         if (file.is_open())
         {
@@ -394,7 +394,7 @@ int main()
         testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
         
         Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth, 0, isCategoricalColumn);
+        trainer.train(root, uniqueTargets, maxDepth, 2, isCategoricalColumn);
         
         cout << "\nRun " << run << ":\n";
         
