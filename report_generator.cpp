@@ -9,14 +9,13 @@
 #include <unordered_map>
 #include <stdlib.h>
 #include <ctime>
+#include <cstring>
 #include "preprocessor.hpp"
 using namespace std;
 
-int isCategorical = 0;
+vector<bool> isCategoricalColumn;
 
-// CSV read
-// code source: stack overflow
-// link: https://stackoverflow.com/questions/1120140/how-can-i-read-and-parse-csv-files-in-c
+// CSV read functions (same as main.cpp)
 enum class CSVState
 {
     UnquotedField,
@@ -28,7 +27,7 @@ std::vector<std::string> readCSVRow(const std::string &row)
 {
     CSVState state = CSVState::UnquotedField;
     std::vector<std::string> fields{""};
-    size_t i = 0; // index of the current field
+    size_t i = 0;
     for (char c : row)
     {
         switch (state)
@@ -36,7 +35,7 @@ std::vector<std::string> readCSVRow(const std::string &row)
         case CSVState::UnquotedField:
             switch (c)
             {
-            case ',': // end of field
+            case ',':
                 fields.push_back("");
                 i++;
                 break;
@@ -62,16 +61,16 @@ std::vector<std::string> readCSVRow(const std::string &row)
         case CSVState::QuotedQuote:
             switch (c)
             {
-            case ',': // , after closing quote
+            case ',':
                 fields.push_back("");
                 i++;
                 state = CSVState::UnquotedField;
                 break;
-            case '"': // "" -> "
+            case '"':
                 fields[i].push_back('"');
                 state = CSVState::QuotedField;
                 break;
-            default: // end of quote
+            default:
                 state = CSVState::UnquotedField;
                 break;
             }
@@ -81,7 +80,6 @@ std::vector<std::string> readCSVRow(const std::string &row)
     return fields;
 }
 
-/// Read CSV file, Excel dialect. Accept "quoted fields ""with quotes"""
 std::vector<std::vector<std::string>> readCSV(std::istream &in)
 {
     std::vector<std::vector<std::string>> table;
@@ -98,65 +96,66 @@ std::vector<std::vector<std::string>> readCSV(std::istream &in)
     }
     return table;
 }
+
 float testAccuracy(node *root, node *testSet)
 {
     int correct = 0;
     int total = testSet->getRows().size();
     int targetCol = root->getTargetColumn();
+
     for (const auto &testRow : testSet->getRows())
     {
         node *curr = root;
         int level = 0;
-        std::vector<float> pathSplits;
-        std::vector<int> pathCols;
-        std::vector<bool> wentLeft;
-        // std::cout << "\033[36mTest row: ";
-        // testRow.print();
-        // std::cout << "\033[0m";
+
         while (!curr->getIsLeaf())
         {
             int splitCol = curr->getSplitCol();
-            float splitVal = curr->getSplitval();
             float val = testRow.row[splitCol];
-            // std::cout << "  Level " << level << ": Feature[" << splitCol << "] = " << val;
-            if (val <= splitVal)
+
+            if (splitCol < isCategoricalColumn.size() && isCategoricalColumn[splitCol])
             {
-                // std::cout << " \033[32m<=\033[0m " << splitVal << " -- go LEFT\n";
-                if (curr->getChildren().size() > 0)
-                    curr = curr->getChildren()[0]; // left child
+                const auto &catMap = curr->getCategoryChildMap();
+                auto it = catMap.find(val);
+                if (it != catMap.end() && it->second < curr->getChildren().size())
+                {
+                    curr = curr->getChildren()[it->second];
+                }
                 else
+                {
                     break;
-                wentLeft.push_back(true);
+                }
             }
             else
             {
-                // std::cout << " \033[31m>\033[0m " << splitVal << " -- go RIGHT\n";
-                if (curr->getChildren().size() > 1)
-                    curr = curr->getChildren()[1]; // right child
+                float splitVal = curr->getSplitval();
+                if (val <= splitVal)
+                {
+                    if (curr->getChildren().size() > 0)
+                        curr = curr->getChildren()[0];
+                    else
+                        break;
+                }
                 else
-                    break;
-                wentLeft.push_back(false);
+                {
+                    if (curr->getChildren().size() > 1)
+                        curr = curr->getChildren()[1];
+                    else
+                        break;
+                }
             }
-            pathSplits.push_back(splitVal);
-            pathCols.push_back(splitCol);
             level++;
         }
-        // At leaf, predict the majority label
+
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
         {
             std::map<int, int> labelCounts;
-            float maxSplitVal = -1e9;
             for (const auto &r : curr->getRows())
             {
                 int label = r.row[targetCol];
                 labelCounts[label]++;
-                // Find max split value in this leaf for debug
-                for (size_t i = 0; i < r.row.size(); ++i)
-                {
-                    if (r.row[i] > maxSplitVal)
-                        maxSplitVal = r.row[i];
-                }
             }
+
             int predicted = -1, maxCount = -1;
             for (const auto &kv : labelCounts)
             {
@@ -166,163 +165,330 @@ float testAccuracy(node *root, node *testSet)
                     predicted = kv.first;
                 }
             }
+
             int actual = testRow.row[targetCol];
-            // std::cout << "  \033[35mReached leaf. Max value in leaf: " << maxSplitVal << ". Predicting: " << predicted << ", Actual: " << actual << "\033[0m\n";
             if (predicted == actual)
                 correct++;
         }
-        // std::cout << "\033[90m-----------------------------\033[0m\n";
     }
+
     return (float)correct / total;
 }
-float testAccuracyCategorical(node *root, node *testSet)
+
+// Function to count nodes in the tree
+int countNodes(node *root)
 {
-    int correct = 0;
-    int total = testSet->getRows().size();
-    int targetCol = root->getTargetColumn();
-    for (const auto &testRow : testSet->getRows())
+    if (!root)
+        return 0;
+
+    int count = 1; // Count current node
+    for (auto child : root->getChildren())
     {
-        node *curr = root;
-        while (!curr->getIsLeaf())
+        count += countNodes(child);
+    }
+    return count;
+}
+
+// Function to get maximum depth of the tree
+int getTreeDepth(node *root)
+{
+    if (!root || root->getIsLeaf())
+        return 0;
+
+    int maxDepth = 0;
+    for (auto child : root->getChildren())
+    {
+        maxDepth = max(maxDepth, getTreeDepth(child));
+    }
+    return maxDepth + 1;
+}
+
+// Function to load and preprocess dataset
+node *loadDataset(const string &filename, unordered_map<string, int> &targetColMap, int &uniqueTargets)
+{
+    node *root = new node(false, 0);
+    std::ifstream file(filename);
+    vector<vector<string>> table;
+
+    if (file.is_open())
+    {
+        table = readCSV(file);
+        file.close();
+    }
+    else
+    {
+        cout << "Error: Could not open file " << filename << endl;
+        return nullptr;
+    }
+
+    targetColMap.clear();
+    uniqueTargets = 0;
+    int totalColumns = table[0].size();
+
+    isCategoricalColumn.clear();
+    isCategoricalColumn.resize(totalColumns, false);
+
+    for (int id = 1; id < table.size(); id++)
+    {
+        auto &rows = table[id];
+        if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
         {
-            int splitCol = curr->getSplitCol();
-            float val = testRow.row[splitCol];
-            const auto &catMap = curr->getCategoryChildMap();
-            auto it = catMap.find(val);
-            if (it != catMap.end() && it->second < curr->getChildren().size())
+            targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
+        }
+        Row currentRow;
+        for (int i = 0; i < totalColumns; i++)
+        {
+            if (i != totalColumns - 1)
             {
-                curr = curr->getChildren()[it->second];
+                try
+                {
+                    stof(rows[i]);
+                }
+                catch (invalid_argument &e)
+                {
+                    Preprocessor preprocessor;
+                    preprocessor.preprocess(table, i);
+                }
+
+                float str_float = stof(rows[i]);
+                currentRow.insertColumn(str_float);
             }
             else
             {
-                break; // Unseen category, fallback to majority at this node
+                currentRow.insertColumn(targetColMap[rows[i]]);
             }
         }
-        // At leaf, predict the majority label
-        if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
-        {
-            std::map<int, int> labelCounts;
-            for (const auto &r : curr->getRows())
-            {
-                int label = r.row[targetCol];
-                labelCounts[label]++;
-            }
-            int predicted = -1, maxCount = -1;
-            for (const auto &kv : labelCounts)
-            {
-                if (kv.second > maxCount)
-                {
-                    maxCount = kv.second;
-                    predicted = kv.first;
-                }
-            }
-            int actual = testRow.row[targetCol];
-            if (predicted == actual)
-                correct++;
-        }
+        root->addRow(currentRow);
     }
-    return (float)correct / total;
+
+    return root;
 }
+
+// Function to create train/test split
+pair<node *, node *> createTrainTestSplit(node *dataset, double testRatio = 0.2, int seed = 42)
+{
+    node *trainSet = new node(false, 0);
+    node *testSet = new node(false, 0);
+
+    // Copy all rows to train set first
+    for (const Row &row : dataset->getRows())
+    {
+        trainSet->addRow(const_cast<Row &>(row));
+    }
+
+    srand(seed);
+    int totalSize = trainSet->getRows().size();
+    int testSize = (int)(totalSize * testRatio);
+
+    // Move random rows from train to test
+    for (int i = 0; i < testSize; i++)
+    {
+        int index = rand() % trainSet->getRows().size();
+        testSet->addRow(trainSet->getRows()[index]);
+        trainSet->getRows().erase(trainSet->getRows().begin() + index);
+    }
+
+    // Set target columns
+    int targetCol = dataset->getRows()[0].row.size() - 1;
+    trainSet->setTargetColumn(targetCol);
+    testSet->setTargetColumn(targetCol);
+
+    return make_pair(trainSet, testSet);
+}
+
+// Function to run experiment for a specific configuration
+struct ExperimentResult
+{
+    int depth;
+    string method;
+    string dataset;
+    float accuracy;
+    int nodeCount;
+    int actualDepth;
+};
+
+ExperimentResult runExperiment(const string &datasetFile, const string &datasetName,
+                               int maxDepth, int gainMethod, const string &methodName,
+                               int runs = 5)
+{
+    ExperimentResult result;
+    result.depth = maxDepth;
+    result.method = methodName;
+    result.dataset = datasetName;
+    result.accuracy = 0;
+    result.nodeCount = 0;
+    result.actualDepth = 0;
+
+    float totalAccuracy = 0;
+    int totalNodes = 0;
+    int totalActualDepth = 0;
+
+    for (int run = 0; run < runs; run++)
+    {
+        unordered_map<string, int> targetColMap;
+        int uniqueTargets = 0;
+
+        // Load dataset
+        node *dataset = loadDataset(datasetFile, targetColMap, uniqueTargets);
+        if (!dataset)
+            continue;
+
+        // Create train/test split
+        auto splitResult = createTrainTestSplit(dataset, 0.2, 42 + run);
+        node *trainSet = splitResult.first;
+        node *testSet = splitResult.second;
+
+        // Train the model
+        Trainer trainer;
+        trainer.train(trainSet, uniqueTargets, maxDepth, gainMethod, isCategoricalColumn);
+
+        // Calculate metrics
+        float accuracy = testAccuracy(trainSet, testSet);
+        int nodeCount = countNodes(trainSet);
+        int actualDepth = getTreeDepth(trainSet);
+
+        totalAccuracy += accuracy;
+        totalNodes += nodeCount;
+        totalActualDepth += actualDepth;
+
+        // Cleanup
+        delete dataset;
+        delete trainSet;
+        delete testSet;
+    }
+
+    result.accuracy = totalAccuracy / runs;
+    result.nodeCount = totalNodes / runs;
+    result.actualDepth = totalActualDepth / runs;
+
+    return result;
+}
+
 int main()
 {
-    vector<int> depths = {2, 3, 4};
-    int runs = 20;
-    string dataset = "Datasets/adult.data"; // You can change this to "Datasets/Iris.csv" or others
-    ofstream report("experiment_results.txt", ios::app);
-    if (!report.is_open())
+    vector<string> datasets = {"Datasets/Iris.csv", "Datasets/adult.data"};
+    vector<string> datasetNames = {"Iris", "Adult"};
+    vector<string> methods = {"IG", "IGR", "NWIG"};
+    vector<int> methodCodes = {0, 1, 2};
+    vector<int> depths = {1, 2, 3, 4, 5};
+
+    vector<ExperimentResult> results;
+
+    cout << "Starting comprehensive decision tree analysis..." << endl;
+    cout << "Testing " << datasets.size() << " datasets, " << methods.size()
+         << " methods, and " << depths.size() << " depth levels." << endl;
+
+    int totalExperiments = datasets.size() * methods.size() * depths.size();
+    int currentExperiment = 0;
+
+    // Run all experiments
+    for (int d = 0; d < datasets.size(); d++)
     {
-        cout << "Failed to open experiment_results.txt for writing.\n";
-        return 1;
-    }
-    report << "\n==== Experiment on " << dataset << " ====" << endl;
-    for (int maxDepth : depths)
-    {
-        float totalAccuracy = 0;
-        report << "\nDepth: " << maxDepth << endl;
-        for (int run = 1; run <= runs; ++run)
+        for (int m = 0; m < methods.size(); m++)
         {
-            node *root = new node(false, 0);
-            std::ifstream file(dataset);
-            vector<vector<string>> table;
-            if (file.is_open())
+            for (int depth : depths)
             {
-                table = readCSV(file);
-                file.close();
+                currentExperiment++;
+                cout << "Running experiment " << currentExperiment << "/" << totalExperiments
+                     << " - Dataset: " << datasetNames[d] << ", Method: " << methods[m]
+                     << ", Depth: " << depth << endl;
+
+                ExperimentResult result = runExperiment(datasets[d], datasetNames[d],
+                                                        depth, methodCodes[m], methods[m]);
+                results.push_back(result);
+
+                cout << "  Accuracy: " << result.accuracy * 100 << "%, Nodes: "
+                     << result.nodeCount << ", Actual Depth: " << result.actualDepth << endl;
             }
-            unordered_map<string, int> targetColMap;
-            int uniqueTargets = 0;
-            int totalColumns = table[0].size();
-            for (int id = 1; id < table.size(); id++)
-            {
-                auto &rows = table[id];
-                if (targetColMap.find(rows[totalColumns - 1]) == targetColMap.end())
-                {
-                    targetColMap[rows[totalColumns - 1]] = uniqueTargets++;
-                }
-                Row currentRow;
-                for (int i = 0; i < totalColumns; i++)
-                {
-                    if (i != totalColumns - 1)
-                    {
-                        try
-                        {
-                            stof(rows[i]);
-                        }
-                        catch (invalid_argument &e)
-                        {
-                            isCategorical = 0;
-                            Preprocessor preprocessor;
-                            preprocessor.preprocess(table, i);
-                        }
-                        float str_float = stof(rows[i]);
-                        currentRow.insertColumn(str_float);
-                    }
-                    else
-                    {
-                        currentRow.insertColumn(targetColMap[rows[i]]);
-                    }
-                }
-                root->addRow(currentRow);
-            }
-            node *testSet = new node(false, 0);
-            srand(time(0) + run + maxDepth * 100);
-            int rootSize = root->getRows().size();
-            for (int i = 0; i < (int)rootSize * 0.2; i++)
-            {
-                int index = rand() % root->getRows().size();
-                testSet->addRow(root->getRows()[index]);
-                if (index >= 0 && index < root->getRows().size())
-                {
-                    root->getRows().erase(root->getRows().begin() + index);
-                }
-            }
-            root->setTargetColumn(root->getRows()[0].row.size() - 1);
-            testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
-            Trainer trainer;
-            trainer.train(root, uniqueTargets, maxDepth, 2);
-            float accuracy = 0.0f;
-            if (isCategorical)
-                accuracy = testAccuracyCategorical(root, testSet);
-            else
-                accuracy = testAccuracy(root, testSet);
-            totalAccuracy += accuracy;
-            // Print tree to file (append mode)
-            std::ofstream treeOut("tree_prints.txt", ios::app);
-            if (treeOut.is_open())
-            {
-                treeOut << "\nRun " << run << " (Depth " << maxDepth << "):\n";
-                root->printTreeToFile(treeOut);
-                treeOut.close();
-            }
-            report << "Run " << run << ": " << accuracy * 100 << "%\n";
-            delete root;
-            delete testSet;
         }
-        report << "Average accuracy for depth " << maxDepth << ": " << (totalAccuracy / runs) * 100 << "%\n";
-        report.flush();
     }
-    report << "==== End of experiment ====\n";
-    report.close();
-    cout << "Experiment completed. Results written to experiment_results.txt\n";
+
+    // Generate CSV files
+
+    // 1. Accuracy vs Max Depth for all combinations
+    ofstream accuracyFile("accuracy_vs_depth.csv");
+    accuracyFile << "Dataset,Method,MaxDepth,Accuracy\n";
+    for (const auto &result : results)
+    {
+        accuracyFile << result.dataset << "," << result.method << ","
+                     << result.depth << "," << result.accuracy * 100 << "\n";
+    }
+    accuracyFile.close();
+
+    // 2. Node Count vs Max Depth for all combinations
+    ofstream nodesFile("nodes_vs_depth.csv");
+    nodesFile << "Dataset,Method,MaxDepth,NodeCount,ActualDepth\n";
+    for (const auto &result : results)
+    {
+        nodesFile << result.dataset << "," << result.method << ","
+                  << result.depth << "," << result.nodeCount << ","
+                  << result.actualDepth << "\n";
+    }
+    nodesFile.close();
+
+    // 3. Separate files for each dataset
+    for (const string &datasetName : datasetNames)
+    {
+        string filename = datasetName + "_analysis.csv";
+        ofstream datasetFile(filename);
+        datasetFile << "Method,MaxDepth,Accuracy,NodeCount,ActualDepth\n";
+
+        for (const auto &result : results)
+        {
+            if (result.dataset == datasetName)
+            {
+                datasetFile << result.method << "," << result.depth << ","
+                            << result.accuracy * 100 << "," << result.nodeCount << ","
+                            << result.actualDepth << "\n";
+            }
+        }
+        datasetFile.close();
+    }
+
+    // 4. Summary statistics
+    ofstream summaryFile("summary_statistics.csv");
+    summaryFile << "Dataset,Method,BestDepth,BestAccuracy,AvgAccuracy,MaxNodes,AvgNodes\n";
+
+    for (const string &datasetName : datasetNames)
+    {
+        for (const string &method : methods)
+        {
+            float bestAccuracy = 0;
+            int bestDepth = 0;
+            float totalAccuracy = 0;
+            int totalNodes = 0;
+            int maxNodes = 0;
+            int count = 0;
+
+            for (const auto &result : results)
+            {
+                if (result.dataset == datasetName && result.method == method)
+                {
+                    if (result.accuracy > bestAccuracy)
+                    {
+                        bestAccuracy = result.accuracy;
+                        bestDepth = result.depth;
+                    }
+                    totalAccuracy += result.accuracy;
+                    totalNodes += result.nodeCount;
+                    maxNodes = max(maxNodes, result.nodeCount);
+                    count++;
+                }
+            }
+
+            summaryFile << datasetName << "," << method << "," << bestDepth << ","
+                        << bestAccuracy * 100 << "," << (totalAccuracy / count) * 100 << ","
+                        << maxNodes << "," << totalNodes / count << "\n";
+        }
+    }
+    summaryFile.close();
+
+    cout << "\nAnalysis complete! Generated files:" << endl;
+    cout << "- accuracy_vs_depth.csv: Accuracy vs maximum depth for all combinations" << endl;
+    cout << "- nodes_vs_depth.csv: Node count vs maximum depth for all combinations" << endl;
+    cout << "- Adult_analysis.csv: Detailed analysis for Adult dataset" << endl;
+    cout << "- Iris_analysis.csv: Detailed analysis for Iris dataset" << endl;
+    cout << "- summary_statistics.csv: Summary statistics and best configurations" << endl;
+
     return 0;
 }

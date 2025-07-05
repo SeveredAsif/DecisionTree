@@ -102,7 +102,7 @@ public:
 
     void printTree(int depth = 0, const node *parent = nullptr, bool isLeft = true) const
     {
-        // ANSI color codes for levels
+        
         const char *colors[] = {"\033[0m", "\033[36m", "\033[32m", "\033[33m", "\033[35m", "\033[31m"};
         int colorIdx = depth % 6;
         std::string indent;
@@ -113,7 +113,7 @@ public:
         {
             if (parent->getChildren().size() > 2)
             {
-                // Multiway split: print value that leads to this child
+               
                 if (!rows.empty())
                 {
                     float val = rows[0].row[parent->getSplitCol()];
@@ -169,7 +169,7 @@ public:
         {
             if (parent->getChildren().size() > 2)
             {
-                // Multiway split: print value that leads to this child
+                
                 if (!rows.empty())
                 {
                     float val = rows[0].row[parent->getSplitCol()];

@@ -9,9 +9,9 @@
 #include <unordered_map>
 #include <stdlib.h>
 #include <ctime>
+#include <cstring>
 #include "preprocessor.hpp"
 using namespace std;
-
 
 vector<bool> isCategoricalColumn;
 
@@ -100,28 +100,25 @@ std::vector<std::vector<std::string>> readCSV(std::istream &in)
     return table;
 }
 
-
-float testAccuracyMixed(node *root, node *testSet)
+float testAccuracy(node *root, node *testSet)
 {
     int correct = 0;
     int total = testSet->getRows().size();
     int targetCol = root->getTargetColumn();
-    
+
     for (const auto &testRow : testSet->getRows())
     {
         node *curr = root;
         int level = 0;
-        
-        
+
         while (!curr->getIsLeaf())
         {
             int splitCol = curr->getSplitCol();
             float val = testRow.row[splitCol];
-            
-            
+
             if (splitCol < isCategoricalColumn.size() && isCategoricalColumn[splitCol])
             {
-                
+
                 const auto &catMap = curr->getCategoryChildMap();
                 auto it = catMap.find(val);
                 if (it != catMap.end() && it->second < curr->getChildren().size())
@@ -130,13 +127,13 @@ float testAccuracyMixed(node *root, node *testSet)
                 }
                 else
                 {
-                    
+
                     break;
                 }
             }
             else
             {
-                
+
                 float splitVal = curr->getSplitval();
                 if (val <= splitVal)
                 {
@@ -155,8 +152,7 @@ float testAccuracyMixed(node *root, node *testSet)
             }
             level++;
         }
-        
-        
+
         if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
         {
             std::map<int, int> labelCounts;
@@ -165,7 +161,7 @@ float testAccuracyMixed(node *root, node *testSet)
                 int label = r.row[targetCol];
                 labelCounts[label]++;
             }
-            
+
             int predicted = -1, maxCount = -1;
             for (const auto &kv : labelCounts)
             {
@@ -175,169 +171,65 @@ float testAccuracyMixed(node *root, node *testSet)
                     predicted = kv.first;
                 }
             }
-            
+
             int actual = testRow.row[targetCol];
             if (predicted == actual)
                 correct++;
         }
     }
-    
+
     return (float)correct / total;
 }
 
 
-float testAccuracy(node *root, node *testSet)
+int main(int argc, char *argv[])
 {
-    int correct = 0;
-    int total = testSet->getRows().size();
-    int targetCol = root->getTargetColumn();
-    for (const auto &testRow : testSet->getRows())
+    int gainCalculationMethod = 0;
+    int maxDepth = 0;
+    if (argc >= 3)
     {
-        node *curr = root;
-        int level = 0;
-        std::vector<float> pathSplits;
-        std::vector<int> pathCols;
-        std::vector<bool> wentLeft;
-        // testRow.print();
-        while (!curr->getIsLeaf())
+        if (strcmp(argv[1], "IG") == 0)
+            gainCalculationMethod = 0;
+        else if (strcmp(argv[1], "IGR") == 0)
+            gainCalculationMethod = 1;
+        else if (strcmp(argv[1], "NWIG") == 0)
+            gainCalculationMethod = 2;
+        else
         {
-            int splitCol = curr->getSplitCol();
-            float splitVal = curr->getSplitval();
-            float val = testRow.row[splitCol];
-            
-            if (val <= splitVal)
-            {
-                if (curr->getChildren().size() > 0)
-                    curr = curr->getChildren()[0]; // left child
-                else
-                    break;
-                wentLeft.push_back(true);
-            }
-            else
-            {
-                if (curr->getChildren().size() > 1)
-                    curr = curr->getChildren()[1]; // right child
-                else
-                    break;
-                wentLeft.push_back(false);
-            }
-            pathSplits.push_back(splitVal);
-            pathCols.push_back(splitCol);
-            level++;
+            cout << "Unknown gain calculation method: " << argv[1] << ". Use IG, IGR, or NWIG.\n";
+            return 1;
         }
-        
-        
-        if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
-        {
-            std::map<int, int> labelCounts;
-            float maxSplitVal = -1e9;
-            for (const auto &r : curr->getRows())
-            {
-                int label = r.row[targetCol];
-                labelCounts[label]++;
-                // Find max split value in this leaf for debug
-                for (size_t i = 0; i < r.row.size(); ++i)
-                {
-                    if (r.row[i] > maxSplitVal)
-                        maxSplitVal = r.row[i];
-                }
-            }
-            int predicted = -1, maxCount = -1;
-            for (const auto &kv : labelCounts)
-            {
-                if (kv.second > maxCount)
-                {
-                    maxCount = kv.second;
-                    predicted = kv.first;
-                }
-            }
-            int actual = testRow.row[targetCol];
-            if (predicted == actual)
-                correct++;
-        }
+        maxDepth = atoi(argv[2]);
     }
-    return (float)correct / total;
-}
-
-float testAccuracyCategorical(node *root, node *testSet)
-{
-    int correct = 0;
-    int total = testSet->getRows().size();
-    int targetCol = root->getTargetColumn();
-    for (const auto &testRow : testSet->getRows())
+    else
     {
-        node *curr = root;
-        while (!curr->getIsLeaf())
-        {
-            int splitCol = curr->getSplitCol();
-            float val = testRow.row[splitCol];
-            const auto &catMap = curr->getCategoryChildMap();
-            auto it = catMap.find(val);
-            if (it != catMap.end() && it->second < curr->getChildren().size())
-            {
-                curr = curr->getChildren()[it->second];
-            }
-            else
-            {
-                break; // Unseen category, fallback to majority at this node
-            }
-        }
-        
-        // At leaf, predict the majority label
-        if (!curr->getRows().empty() && curr->getRows()[0].row.size() > targetCol)
-        {
-            std::map<int, int> labelCounts;
-            for (const auto &r : curr->getRows())
-            {
-                int label = r.row[targetCol];
-                labelCounts[label]++;
-            }
-            int predicted = -1, maxCount = -1;
-            for (const auto &kv : labelCounts)
-            {
-                if (kv.second > maxCount)
-                {
-                    maxCount = kv.second;
-                    predicted = kv.first;
-                }
-            }
-            int actual = testRow.row[targetCol];
-            if (predicted == actual)
-                correct++;
-        }
+        cout << "Usage: " << argv[0] << " <gainCalculationMethod> <maxDepth>\n";
+        cout << "  gainCalculationMethod: IG, IGR, NWIG\n";
+        cout << "  maxDepth: integer\n";
+        return 1;
     }
-    return (float)correct / total;
-}
-
-int main()
-{
-    int maxDepth;
-    cout << "Enter max depth for the tree: ";
-    cin >> maxDepth;
     float totalAccuracy = 0;
     int runs = 1;
-    
     for (int run = 1; run <= runs; ++run)
     {
-        //adult.data
-        //Iris.csv
+        // adult.data
+        // Iris.csv
         node *root = new node(false, 0);
-        std::ifstream file("Datasets/Iris.csv");
+        std::ifstream file("Datasets/adult.data");
         vector<vector<string>> table;
         if (file.is_open())
         {
             table = readCSV(file);
             file.close();
         }
-        
+
         unordered_map<string, int> targetColMap;
         int uniqueTargets = 0;
         int totalColumns = table[0].size();
-        
-       
+
         isCategoricalColumn.clear();
         isCategoricalColumn.resize(totalColumns, false);
-        
+
         for (int id = 1; id < table.size(); id++)
         {
             auto &rows = table[id];
@@ -356,11 +248,11 @@ int main()
                     }
                     catch (invalid_argument &e)
                     {
-                        //isCategoricalColumn[i] = true;
-                        //cout << "String error caught" << endl;
+                        // isCategoricalColumn[i] = true;
+                        // cout << "String error caught" << endl;
                         Preprocessor preprocessor;
                         preprocessor.preprocess(table, i);
-                        //cout << "pre process done" << endl;
+                        // cout << "pre process done" << endl;
                     }
 
                     float str_float = stof(rows[i]);
@@ -373,7 +265,7 @@ int main()
             }
             root->addRow(currentRow);
         }
-        
+
         node *testSet = new node(false, 0);
         srand(time(0) + run);
         int rootSize = root->getRows().size();
@@ -386,57 +278,30 @@ int main()
                 root->getRows().erase(root->getRows().begin() + index);
             }
         }
-        
+
         cout << "train set: " << root->getRows().size() << endl;
         cout << "test set: " << testSet->getRows().size() << endl;
-        
+
         root->setTargetColumn(root->getRows()[0].row.size() - 1);
         testSet->setTargetColumn(root->getRows()[0].row.size() - 1);
-        
+
         Trainer trainer;
-        trainer.train(root, uniqueTargets, maxDepth, 2, isCategoricalColumn);
-        
+        trainer.train(root, uniqueTargets, maxDepth, gainCalculationMethod, isCategoricalColumn);
+
         cout << "\nRun " << run << ":\n";
-        
-        // Print tree to file
-        std::ofstream treeOut("tree_output.txt");
+
         root->printTree();
-        if (treeOut.is_open())
-        {
-            root->printTreeToFile(treeOut);
-            treeOut.close();
-            cout << "Tree written to tree_output.txt\n";
-        }
-        else
-        {
-            cout << "Failed to open tree_output.txt for writing.\n";
-        }
         
-        // Export tree to DOT format for Graphviz
-        std::ofstream dotOut("tree.dot");
-        if (dotOut.is_open())
-        {
-            dotOut << "digraph DecisionTree {\n";
-            int nodeId = 0;
-            root->exportToDot(dotOut, nodeId);
-            dotOut << "}\n";
-            dotOut.close();
-            cout << "Tree exported to tree.dot (Graphviz format)\n";
-        }
-        else
-        {
-            cout << "Failed to open tree.dot for writing.\n";
-        }
-        
+
         // Use the new mixed accuracy function
-        float accuracy = testAccuracyMixed(root, testSet);
+        float accuracy = testAccuracy(root, testSet);
         cout << "Test set accuracy: " << accuracy * 100 << "%\n";
         totalAccuracy += accuracy;
-        
+
         delete root;
         delete testSet;
     }
-    
+
     cout << "\nAverage accuracy over " << runs << " runs: " << (totalAccuracy / runs) * 100 << "%\n";
     return 0;
 }

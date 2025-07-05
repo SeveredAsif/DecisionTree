@@ -65,7 +65,7 @@ private:
         vector<Row> currentAllRows = currNode->getRows();
         if (bestSplit != -1)
         {
-            cout << "Continuous Split on column " << splitCol << endl;
+            //cout << "Continuous Split on column " << splitCol << endl;
             node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
             leftNode->setDepth(currNode->getDepth() + 1);
             node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
@@ -95,7 +95,7 @@ private:
         else
         {
             isCategoricalColumn[splitCol] = true;
-            cout << "categorical Split on column " << splitCol << endl;
+            //cout << "categorical Split on column " << splitCol << endl;
             // find how many unique in split column
             unordered_map<float, int> unique_val_map;
             int unique_split_val = 0;
@@ -145,9 +145,9 @@ private:
             float minVal = currentAllRows.front().row[splitCol];
             float maxVal = currentAllRows.back().row[splitCol];
             vector<float> splitValues;
-            for (int b = 1; b < 100; ++b)
+            for (int b = 1; b < 10; ++b)
             {
-                float split = minVal + b * (float)(maxVal - minVal) / 100;
+                float split = minVal + b * (float)(maxVal - minVal) / 10;
                 splitValues.push_back(split);
             }
             // get the rows that have less than or equal average value than the calculated average.
@@ -341,6 +341,11 @@ private:
 public:
     void train(node *&root, int unique, int maxDepth, int gainMode, vector<bool> &isCategoricalColumn)
     {
+        
+        if(maxDepth==0)
+        {
+            maxDepth=1e9;
+        }
         // printf("Unique: %d\n", unique);
 
         // split the node using the maximum gain
