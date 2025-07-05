@@ -370,7 +370,7 @@ int main()
     vector<string> datasetNames = {"Iris", "Adult"};
     vector<string> methods = {"IG", "IGR", "NWIG"};
     vector<int> methodCodes = {0, 1, 2};
-    vector<int> depths = {1, 2, 3, 4, 5};
+    vector<int> depths = {0};
 
     vector<ExperimentResult> results;
 
@@ -406,7 +406,7 @@ int main()
     // Generate CSV files
 
     // 1. Accuracy vs Max Depth for all combinations
-    ofstream accuracyFile("accuracy_vs_depth.csv");
+    ofstream accuracyFile("accuracy_vs_depth_no_prune.csv");
     accuracyFile << "Dataset,Method,MaxDepth,Accuracy\n";
     for (const auto &result : results)
     {
@@ -416,7 +416,7 @@ int main()
     accuracyFile.close();
 
     // 2. Node Count vs Max Depth for all combinations
-    ofstream nodesFile("nodes_vs_depth.csv");
+    ofstream nodesFile("nodes_vs_depth_no_prune.csv");
     nodesFile << "Dataset,Method,MaxDepth,NodeCount,ActualDepth\n";
     for (const auto &result : results)
     {
@@ -429,7 +429,7 @@ int main()
     // 3. Separate files for each dataset
     for (const string &datasetName : datasetNames)
     {
-        string filename = datasetName + "_analysis.csv";
+        string filename = datasetName + "_analysis_no_prune.csv";
         ofstream datasetFile(filename);
         datasetFile << "Method,MaxDepth,Accuracy,NodeCount,ActualDepth\n";
 
@@ -446,7 +446,7 @@ int main()
     }
 
     // 4. Summary statistics
-    ofstream summaryFile("summary_statistics.csv");
+    ofstream summaryFile("summary_statistics_no_prune.csv");
     summaryFile << "Dataset,Method,BestDepth,BestAccuracy,AvgAccuracy,MaxNodes,AvgNodes\n";
 
     for (const string &datasetName : datasetNames)

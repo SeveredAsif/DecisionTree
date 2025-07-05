@@ -96,7 +96,7 @@ private:
         {
             isCategoricalColumn[splitCol] = true;
             //cout << "categorical Split on column " << splitCol << endl;
-            // find how many unique in split column
+            //  find how many unique in split column
             unordered_map<float, int> unique_val_map;
             int unique_split_val = 0;
             for (const auto &row : currentAllRows)
@@ -145,9 +145,9 @@ private:
             float minVal = currentAllRows.front().row[splitCol];
             float maxVal = currentAllRows.back().row[splitCol];
             vector<float> splitValues;
-            for (int b = 1; b < 10; ++b)
+            for (int b = 1; b < 4; ++b)
             {
-                float split = minVal + b * (float)(maxVal - minVal) / 10;
+                float split = minVal + b * (float)(maxVal - minVal) / 4;
                 splitValues.push_back(split);
             }
             // get the rows that have less than or equal average value than the calculated average.
@@ -258,8 +258,15 @@ private:
             }
             else if (gainMode == 1)
             {
-                float IV = -(((float)bestSplitLeftTotal / currentAllRows.size()) * log2(((float)bestSplitLeftTotal / currentAllRows.size())) - ((float)bestSplitRightTotal / currentAllRows.size()) * log2(((float)bestSplitRightTotal / currentAllRows.size())));
-                float gainRatio = (float)currentBestGain / IV;
+               
+                float pLeft = (float)bestSplitLeftTotal / currentAllRows.size();
+                float pRight = (float)bestSplitRightTotal / currentAllRows.size();
+                float IV = 0.0f;
+                if (pLeft > 0)
+                    IV -= pLeft * log2(pLeft);
+                if (pRight > 0)
+                    IV -= pRight * log2(pRight);
+                float gainRatio = (IV > 0) ? (currentBestGain / IV) : 0;
                 return {gainRatio, currentBestSplit};
             }
             else
@@ -316,7 +323,9 @@ private:
             for (int child = 0; child < children.size(); child++)
             {
                 informationGain -= ((float)childrenRowCount[child] / currentAllRows.size()) * entropy[child];
-                IV -= ((float)childrenRowCount[child] / currentAllRows.size()) * log2((float)childrenRowCount[child] / currentAllRows.size());
+                float p = (float)childrenRowCount[child] / currentAllRows.size();
+                if (p > 0)
+                    IV -= p * log2(p);
             }
             if (gainMode == 0)
             {
@@ -324,8 +333,8 @@ private:
             }
             else if (gainMode == 1)
             {
-
-                float gainRatio = (float)informationGain / IV;
+                
+                float gainRatio = (IV > 0) ? (informationGain / IV) : 0;
                 return {gainRatio, -1};
             }
             else
@@ -341,10 +350,10 @@ private:
 public:
     void train(node *&root, int unique, int maxDepth, int gainMode, vector<bool> &isCategoricalColumn)
     {
-        
-        if(maxDepth==0)
+
+        if (maxDepth == 0)
         {
-            maxDepth=1e9;
+            maxDepth = 1e9;
         }
         // printf("Unique: %d\n", unique);
 
@@ -395,7 +404,7 @@ public:
                     // cout << "unique values: " << uniqueValues << " on column" << i << ",so categorical" << endl;
                 }
 
-                if (doneColumn[i] == true && isCategorical == 1)
+                if (doneColumn[i] == true )
                 {
                     continue; // cout << "skipping column " << i << " because categorical data and this column already done" << endl;
                 }

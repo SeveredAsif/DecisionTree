@@ -196,24 +196,40 @@ int countNodes(node *root)
     return count;
 }
 
+// Function to get maximum depth of the tree
+int getTreeDepth(node *root)
+{
+    if (!root || root->getIsLeaf())
+        return 0;
+
+    int maxDepth = 0;
+    for (auto child : root->getChildren())
+    {
+        maxDepth = max(maxDepth, getTreeDepth(child));
+    }
+    return maxDepth + 1;
+}
+
 // Run experiments and generate reports for a single dataset
 void runExperiments(const string &datasetPath, const string &datasetName)
 {
     cout << "Running experiments for dataset: " << datasetName << endl;
 
     // Create result containers
-    map<string, vector<float>> accuracyByMethod; // Method -> [accuracy for each depth]
-    map<string, vector<int>> nodesByMethod;      // Method -> [nodes for each depth]
+    map<string, vector<float>> accuracyByMethod;  // Method -> [accuracy for each depth]
+    map<string, vector<int>> nodesByMethod;       // Method -> [nodes for each depth]
+    map<string, vector<int>> actualDepthByMethod; // Method -> [actual depth for each depth]
 
     vector<string> methods = {"IG", "IGR", "NWIG"};
-    vector<int> depths = {2, 3, 4, 5}; // Test depths from 1 to 10
-    int numExperiments = 20;           // Run 20 experiments for each configuration
+    vector<int> depths = { 2, 3, 4, 5,0}; // 0 means no pruning
+    int numExperiments = 20;              // Run 20 experiments for each configuration
 
     // Initialize result containers
     for (const auto &method : methods)
     {
         accuracyByMethod[method] = vector<float>(depths.size(), 0.0);
         nodesByMethod[method] = vector<int>(depths.size(), 0);
+        actualDepthByMethod[method] = vector<int>(depths.size(), 0);
     }
 
     // Load the dataset once
@@ -230,10 +246,11 @@ void runExperiments(const string &datasetPath, const string &datasetName)
         return;
     }
 
-    // Write accuracy and node count results to CSV after each run
-    ofstream accuracyFile(datasetName + "_accuracyWEIRD.csv");
-    ofstream nodesFile(datasetName + "_nodesWEIRD.csv");
-    ofstream eachRunInfo("eachRunInfoWEIRD.txt", ios::app);
+    // Write accuracy, node count, and actual depth results to CSV after each run
+    ofstream accuracyFile(datasetName + "_accuracy5JUL.csv");
+    ofstream nodesFile(datasetName + "_nodes5JUL.csv");
+    ofstream actualDepthFile(datasetName + "_actualDepth5JUL.csv");
+    ofstream eachRunInfo(datasetName+"eachRunInfo5JUL.txt", ios::app);
     if (accuracyFile.is_open())
     {
         accuracyFile << "Depth,";
@@ -251,6 +268,15 @@ void runExperiments(const string &datasetPath, const string &datasetName)
             nodesFile << method << ",";
         }
         nodesFile << endl;
+    }
+    if (actualDepthFile.is_open())
+    {
+        actualDepthFile << "Depth,";
+        for (const auto &method : methods)
+        {
+            actualDepthFile << method << ",";
+        }
+        actualDepthFile << endl;
     }
     // Process each method and depth combination
     for (const auto &method : methods)
@@ -270,6 +296,7 @@ void runExperiments(const string &datasetPath, const string &datasetName)
             cout << "    Processing depth: " << depth << endl;
             float totalAccuracy = 0.0;
             int totalNodes = 0;
+            int totalActualDepth = 0;
             auto depthStart = chrono::high_resolution_clock::now();
             for (int exp = 0; exp < numExperiments; exp++)
             {
@@ -369,13 +396,15 @@ void runExperiments(const string &datasetPath, const string &datasetName)
                     // Test accuracy
                     float accuracy = testAccuracy(root, testSet);
                     int nodeCount = countNodes(root);
+                    int actualDepth = getTreeDepth(root);
 
                     totalAccuracy += accuracy;
                     totalNodes += nodeCount;
+                    totalActualDepth += actualDepth;
                     // Write progress to console and CSV after each run
                     auto expEnd = chrono::high_resolution_clock::now();
                     double expTime = chrono::duration<double>(expEnd - expStart).count();
-                    string runMsg = "      Run " + to_string(exp + 1) + "/" + to_string(numExperiments) + ": Accuracy = " + to_string(accuracy * 100) + "% , Nodes = " + to_string(nodeCount) + ", Time = " + to_string(expTime) + "s\n";
+                    string runMsg = "      Run " + to_string(exp + 1) + "/" + to_string(numExperiments) + ": Accuracy = " + to_string(accuracy * 100) + "% , Nodes = " + to_string(nodeCount) + ", ActualDepth = " + to_string(actualDepth) + ", Time = " + to_string(expTime) + "s\n";
                     cout << runMsg;
                     if (eachRunInfo.is_open())
                         eachRunInfo << "Method: " << method << ", Depth: " << depth << ", " << runMsg;
@@ -396,9 +425,12 @@ void runExperiments(const string &datasetPath, const string &datasetName)
                 accuracyFile << endl;
             if (nodesFile.is_open())
                 nodesFile << endl;
+            if (actualDepthFile.is_open())
+                actualDepthFile << endl;
             // Calculate averages
             accuracyByMethod[method][d] = totalAccuracy / numExperiments;
             nodesByMethod[method][d] = totalNodes / numExperiments;
+            actualDepthByMethod[method][d] = totalActualDepth / numExperiments;
         }
         auto methodEnd = chrono::high_resolution_clock::now();
         double methodTime = chrono::duration<double>(methodEnd - methodStart).count();
@@ -414,7 +446,10 @@ void runExperiments(const string &datasetPath, const string &datasetName)
     {
         for (size_t d = 0; d < depths.size(); d++)
         {
-            accuracyFile << depths[d] << ",";
+            if (depths[d] == 0)
+                accuracyFile << "NoPrune,";
+            else
+                accuracyFile << depths[d] << ",";
             for (const auto &method : methods)
             {
                 accuracyFile << accuracyByMethod[method][d] * 100 << ",";
@@ -426,12 +461,30 @@ void runExperiments(const string &datasetPath, const string &datasetName)
     {
         for (size_t d = 0; d < depths.size(); d++)
         {
-            nodesFile << depths[d] << ",";
+            if (depths[d] == 0)
+                nodesFile << "NoPrune,";
+            else
+                nodesFile << depths[d] << ",";
             for (const auto &method : methods)
             {
                 nodesFile << nodesByMethod[method][d] << ",";
             }
             nodesFile << endl;
+        }
+    }
+    if (actualDepthFile.is_open())
+    {
+        for (size_t d = 0; d < depths.size(); d++)
+        {
+            if (depths[d] == 0)
+                actualDepthFile << "NoPrune,";
+            else
+                actualDepthFile << depths[d] << ",";
+            for (const auto &method : methods)
+            {
+                actualDepthFile << actualDepthByMethod[method][d] << ",";
+            }
+            actualDepthFile << endl;
         }
     }
 }
