@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 os.makedirs('graphs', exist_ok=True)
 
 # Read CSVs
-acc = pd.read_csv('Iris_accuracy5JUL.csv')
-nodes = pd.read_csv('Iris_nodes5JUL.csv')
-actual_depth = pd.read_csv('Iris_actualDepth5JUL.csv')
+acc = pd.read_csv('Adult_accuracy6JUL.csv')
+nodes = pd.read_csv('Adult_nodes6JUL.csv')
+actual_depth = pd.read_csv('Adult_actualDepth6JUL.csv')
 
 # Clean up the data (remove empty rows)
 acc = acc.dropna(how='all')
@@ -31,11 +31,11 @@ for method in ['IG', 'IGR', 'NWIG']:
 plt.xticks(x, depth_labels)
 plt.xlabel('Max Tree Depth')
 plt.ylabel('Average Accuracy (%)')
-plt.title('Iris: Average Accuracy vs Max Tree Depth')
+plt.title('Adult: Average Accuracy vs Max Tree Depth')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('graphs/Iris_accuracy_vs_depth.png')
+plt.savefig('graphs/Adult_accuracy_vs_depth.png')
 plt.close()
 
 # Plot Nodes vs Depth
@@ -45,11 +45,11 @@ for method in ['IG', 'IGR', 'NWIG']:
 plt.xticks(x, depth_labels)
 plt.xlabel('Max Tree Depth')
 plt.ylabel('Number of Nodes')
-plt.title('Iris: Number of Nodes vs Max Tree Depth')
+plt.title('Adult: Number of Nodes vs Max Tree Depth')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('graphs/Iris_nodes_vs_depth.png')
+plt.savefig('graphs/Adult_nodes_vs_depth.png')
 plt.close()
 
 # Plot Actual Depth vs Max Depth
@@ -59,11 +59,11 @@ for method in ['IG', 'IGR', 'NWIG']:
 plt.xticks(x, depth_labels)
 plt.xlabel('Max Tree Depth')
 plt.ylabel('Actual Tree Depth')
-plt.title('Iris: Actual Tree Depth vs Max Tree Depth')
+plt.title('Adult: Actual Tree Depth vs Max Tree Depth')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('graphs/Iris_actualDepth_vs_maxDepth.png')
+plt.savefig('graphs/Adult_actualDepth_vs_maxDepth.png')
 plt.close()
 
 print("Graphs saved in the 'graphs/' folder.")

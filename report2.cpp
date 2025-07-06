@@ -221,7 +221,7 @@ void runExperiments(const string &datasetPath, const string &datasetName)
     map<string, vector<int>> actualDepthByMethod; // Method -> [actual depth for each depth]
 
     vector<string> methods = {"IG", "IGR", "NWIG"};
-    vector<int> depths = { 2, 3, 4, 5,0}; // 0 means no pruning
+    vector<int> depths = {2,3,4,5}; // 0 means no pruning
     int numExperiments = 20;              // Run 20 experiments for each configuration
 
     // Initialize result containers
@@ -247,10 +247,10 @@ void runExperiments(const string &datasetPath, const string &datasetName)
     }
 
     // Write accuracy, node count, and actual depth results to CSV after each run
-    ofstream accuracyFile(datasetName + "_accuracy5JUL.csv");
-    ofstream nodesFile(datasetName + "_nodes5JUL.csv");
-    ofstream actualDepthFile(datasetName + "_actualDepth5JUL.csv");
-    ofstream eachRunInfo(datasetName+"eachRunInfo5JUL.txt", ios::app);
+    ofstream accuracyFile(datasetName + "_accuracy6JUL.csv");
+    ofstream nodesFile(datasetName + "_nodes6JUL.csv");
+    ofstream actualDepthFile(datasetName + "_actualDepth6JUL.csv");
+    ofstream eachRunInfo(datasetName+"eachRunInfo6JUL.txt", ios::app);
     if (accuracyFile.is_open())
     {
         accuracyFile << "Depth,";
@@ -498,7 +498,7 @@ int main()
     // runExperiments("Datasets/Iris.csv", "Iris");
 
     // Run experiments for Iris.csv
-    runExperiments("Datasets/adult.data", "Adult");
+    runExperiments("Datasets/reduced.csv", "Adult");
 
     cout << "All experiments completed." << endl;
     cout << "CSV files generated for plotting:" << endl;

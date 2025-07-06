@@ -65,7 +65,7 @@ private:
         vector<Row> currentAllRows = currNode->getRows();
         if (bestSplit != -1)
         {
-            //cout << "Continuous Split on column " << splitCol << endl;
+           // cout << "Continuous Split on column " << splitCol << endl;
             node *leftNode = new node(false, currentAllRows[0].row.size() - 1);
             leftNode->setDepth(currNode->getDepth() + 1);
             node *rightNode = new node(false, currentAllRows[0].row.size() - 1);
@@ -95,7 +95,7 @@ private:
         else
         {
             isCategoricalColumn[splitCol] = true;
-            //cout << "categorical Split on column " << splitCol << endl;
+           // cout << "categorical Split on column " << splitCol << endl;
             //  find how many unique in split column
             unordered_map<float, int> unique_val_map;
             int unique_split_val = 0;
@@ -404,7 +404,7 @@ public:
                     // cout << "unique values: " << uniqueValues << " on column" << i << ",so categorical" << endl;
                 }
 
-                if (doneColumn[i] == true )
+                if (doneColumn[i] == true && isCategorical == 1)
                 {
                     continue; // cout << "skipping column " << i << " because categorical data and this column already done" << endl;
                 }
